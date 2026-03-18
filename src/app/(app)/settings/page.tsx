@@ -5,22 +5,36 @@ import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { MODELS, type ModelKey } from "@/lib/llm";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 
 export default function SettingsPage() {
   const router = useRouter();
   const [email, setEmail] = useState("");
+  const [isAnonymous, setIsAnonymous] = useState(false);
   const [preferredModel, setPreferredModel] = useState<ModelKey>("fast");
   const [docCount, setDocCount] = useState(0);
   const [totalSize, setTotalSize] = useState(0);
   const [saving, setSaving] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+
+  // For anonymous account creation
+  const [newEmail, setNewEmail] = useState("");
+  const [newPassword, setNewPassword] = useState("");
+  const [convertLoading, setConvertLoading] = useState(false);
+  const [convertSuccess, setConvertSuccess] = useState(false);
+  const [convertError, setConvertError] = useState<string | null>(null);
 
   useEffect(() => {
     async function load() {
       const supabase = createClient();
       const { data: { user } } = await supabase.auth.getUser();
-      if (user) setEmail(user.email ?? "");
+      if (user) {
+        setEmail(user.email ?? "");
+        setIsAnonymous((user as { is_anonymous?: boolean }).is_anonymous ?? false);
+      }
 
       const profileRes = await fetch("/api/profile");
       if (profileRes.ok) {
@@ -53,14 +67,16 @@ export default function SettingsPage() {
   }
 
   async function handleDeleteAll() {
-    if (!confirm("Delete all documents? This cannot be undone.")) return;
     setDeleting(true);
+    setShowDeleteConfirm(false);
     const docsRes = await fetch("/api/documents");
     if (docsRes.ok) {
       const { documents } = await docsRes.json();
-      for (const doc of documents) {
-        await fetch(`/api/documents?id=${encodeURIComponent(doc.id)}`, { method: "DELETE" });
-      }
+      await Promise.all(
+        documents.map((doc: { id: string }) =>
+          fetch(`/api/documents?id=${encodeURIComponent(doc.id)}`, { method: "DELETE" })
+        )
+      );
     }
     setDeleting(false);
     setDocCount(0);
@@ -73,6 +89,21 @@ export default function SettingsPage() {
     await supabase.auth.signOut();
     router.push("/login");
     router.refresh();
+  }
+
+  async function handleCreateAccount(e: React.FormEvent) {
+    e.preventDefault();
+    setConvertError(null);
+    setConvertLoading(true);
+    const supabase = createClient();
+    const { error } = await supabase.auth.updateUser({ email: newEmail, password: newPassword });
+    if (error) {
+      setConvertError(error.message);
+      setConvertLoading(false);
+      return;
+    }
+    setConvertSuccess(true);
+    setConvertLoading(false);
   }
 
   function formatSize(bytes: number): string {
@@ -91,16 +122,65 @@ export default function SettingsPage() {
         </div>
       )}
 
-      {/* Account */}
-      <section className="space-y-3">
-        <h2 className="text-sm font-medium text-muted-foreground uppercase tracking-wider">Account</h2>
-        <div className="rounded-lg border border-border bg-card p-4 space-y-2">
-          <div className="flex justify-between text-sm">
-            <span className="text-muted-foreground">Email</span>
-            <span className="text-foreground">{email}</span>
+      {/* Create account — only for guests */}
+      {isAnonymous && (
+        <section className="space-y-3">
+          <h2 className="text-sm font-medium text-muted-foreground uppercase tracking-wider">Create Account</h2>
+          <div className="rounded-lg border border-border bg-card p-4 space-y-4">
+            {convertSuccess ? (
+              <p className="text-sm text-foreground">
+                Check your email to confirm your account. Your documents and conversations will be preserved.
+              </p>
+            ) : (
+              <>
+                <p className="text-sm text-muted-foreground">
+                  Create an account to keep your documents and conversations across sessions.
+                </p>
+                <form onSubmit={handleCreateAccount} className="space-y-3">
+                  <Input
+                    id="new-email"
+                    label="Email"
+                    type="email"
+                    placeholder="you@example.com"
+                    value={newEmail}
+                    onChange={(e) => setNewEmail(e.target.value)}
+                    required
+                  />
+                  <Input
+                    id="new-password"
+                    label="Password"
+                    type="password"
+                    placeholder="••••••••"
+                    value={newPassword}
+                    onChange={(e) => setNewPassword(e.target.value)}
+                    minLength={6}
+                    required
+                  />
+                  {convertError && (
+                    <p className="text-sm text-destructive">{convertError}</p>
+                  )}
+                  <Button type="submit" loading={convertLoading} size="sm">
+                    Create account
+                  </Button>
+                </form>
+              </>
+            )}
           </div>
-        </div>
-      </section>
+        </section>
+      )}
+
+      {/* Account — only for registered users */}
+      {!isAnonymous && (
+        <section className="space-y-3">
+          <h2 className="text-sm font-medium text-muted-foreground uppercase tracking-wider">Account</h2>
+          <div className="rounded-lg border border-border bg-card p-4 space-y-2">
+            <div className="flex justify-between text-sm">
+              <span className="text-muted-foreground">Email</span>
+              <span className="text-foreground">{email}</span>
+            </div>
+          </div>
+        </section>
+      )}
 
       {/* Model preference */}
       <section className="space-y-3">
@@ -152,8 +232,9 @@ export default function SettingsPage() {
           <Button
             variant="destructive"
             size="sm"
-            onClick={handleDeleteAll}
+            onClick={() => setShowDeleteConfirm(true)}
             loading={deleting}
+            disabled={docCount === 0}
           >
             Delete all documents
           </Button>
@@ -166,6 +247,15 @@ export default function SettingsPage() {
           Sign out
         </Button>
       </section>
+
+      <ConfirmDialog
+        open={showDeleteConfirm}
+        title="Delete all documents?"
+        message="This will permanently delete all your documents and conversations. This cannot be undone."
+        confirmLabel="Delete all"
+        onConfirm={handleDeleteAll}
+        onCancel={() => setShowDeleteConfirm(false)}
+      />
     </div>
   );
 }

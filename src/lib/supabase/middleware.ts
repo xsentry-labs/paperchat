@@ -31,7 +31,11 @@ export async function updateSession(request: NextRequest) {
 
   const isAuthRoute =
     request.nextUrl.pathname.startsWith("/login") ||
-    request.nextUrl.pathname.startsWith("/signup");
+    request.nextUrl.pathname.startsWith("/signup") ||
+    request.nextUrl.pathname.startsWith("/forgot-password") ||
+    request.nextUrl.pathname.startsWith("/reset-password");
+
+  const isAnonymous = (user as { is_anonymous?: boolean } | null)?.is_anonymous ?? false;
 
   // Unauthenticated users can only access auth routes
   if (!user && !isAuthRoute && !request.nextUrl.pathname.startsWith("/auth")) {
@@ -40,8 +44,9 @@ export async function updateSession(request: NextRequest) {
     return NextResponse.redirect(url);
   }
 
-  // Authenticated users shouldn't see auth pages
-  if (user && isAuthRoute) {
+  // Authenticated non-anonymous users shouldn't see auth pages
+  // Anonymous users can access signup to convert their account
+  if (user && !isAnonymous && isAuthRoute) {
     const url = request.nextUrl.clone();
     url.pathname = "/";
     return NextResponse.redirect(url);

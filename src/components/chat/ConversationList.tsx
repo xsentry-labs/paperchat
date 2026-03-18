@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { useRouter, usePathname } from "next/navigation";
 import type { Conversation } from "@/lib/types";
+import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 
 interface ConversationWithDoc extends Conversation {
   documents?: { filename: string };
@@ -10,6 +11,7 @@ interface ConversationWithDoc extends Conversation {
 
 export function ConversationList() {
   const [conversations, setConversations] = useState<ConversationWithDoc[]>([]);
+  const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
   const router = useRouter();
   const pathname = usePathname();
 
@@ -25,8 +27,11 @@ export function ConversationList() {
     }
   }
 
-  async function handleDelete(e: React.MouseEvent, id: string) {
-    e.stopPropagation();
+  async function handleDeleteConfirmed() {
+    if (!confirmDeleteId) return;
+    const id = confirmDeleteId;
+    setConfirmDeleteId(null);
+
     const res = await fetch(`/api/conversations?id=${encodeURIComponent(id)}`, {
       method: "DELETE",
     });
@@ -39,6 +44,8 @@ export function ConversationList() {
   }
 
   if (conversations.length === 0) return null;
+
+  const confirmConv = conversations.find((c) => c.id === confirmDeleteId);
 
   return (
     <div className="border-t border-border pt-2">
@@ -60,8 +67,12 @@ export function ConversationList() {
               >
                 <span className="flex-1 truncate">{conv.title}</span>
                 <button
-                  onClick={(e) => handleDelete(e, conv.id)}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setConfirmDeleteId(conv.id);
+                  }}
                   className="hidden group-hover:block text-muted-foreground hover:text-destructive text-xs px-1"
+                  title="Delete conversation"
                 >
                   ✕
                 </button>
@@ -70,6 +81,15 @@ export function ConversationList() {
           );
         })}
       </ul>
+
+      <ConfirmDialog
+        open={!!confirmDeleteId}
+        title="Delete conversation?"
+        message={`"${confirmConv?.title}" and all its messages will be permanently deleted.`}
+        confirmLabel="Delete"
+        onConfirm={handleDeleteConfirmed}
+        onCancel={() => setConfirmDeleteId(null)}
+      />
     </div>
   );
 }

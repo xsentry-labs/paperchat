@@ -31,7 +31,7 @@ export default async function AppLayout({
           <ConversationList />
         </div>
 
-        <UserMenu email={user.email ?? ""} />
+        <UserMenu email={user.email ?? ""} isAnonymous={(user as { is_anonymous?: boolean }).is_anonymous ?? false} />
       </aside>
 
       {/* Main content */}

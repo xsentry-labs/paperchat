@@ -22,20 +22,31 @@ interface Citation {
   quote: string;
 }
 
+const DAILY_LIMIT = 50;
+
+const STARTER_QUESTIONS = [
+  "What is this document about?",
+  "Summarize the key points",
+  "What are the main conclusions?",
+];
+
 export function ChatPanel({ conversationId, documentFilename }: ChatPanelProps) {
   const [history, setHistory] = useState<ChatMessage[]>([]);
   const [citations, setCitations] = useState<Record<string, Citation[]>>({});
   const [inputValue, setInputValue] = useState("");
   const [currentModel, setCurrentModel] = useState<ModelKey>("fast");
   const [chatError, setChatError] = useState<string | null>(null);
+  const [rateLimitRemaining, setRateLimitRemaining] = useState<number | null>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
 
-  // Load existing messages + user model preference
+  // Load existing messages, user model preference, and rate limit status
   useEffect(() => {
     async function load() {
-      const [msgRes, profileRes] = await Promise.all([
+      const [msgRes, profileRes, rateLimitRes] = await Promise.all([
         fetch(`/api/conversations/${conversationId}/messages`),
         fetch("/api/profile"),
+        fetch("/api/rate-limit"),
       ]);
 
       if (msgRes.ok) {
@@ -56,6 +67,11 @@ export function ChatPanel({ conversationId, documentFilename }: ChatPanelProps) 
           setCurrentModel(profile.preferred_model as ModelKey);
         }
       }
+
+      if (rateLimitRes.ok) {
+        const data = await rateLimitRes.json();
+        setRateLimitRemaining(data.remaining);
+      }
     }
     load();
   }, [conversationId]);
@@ -68,24 +84,32 @@ export function ChatPanel({ conversationId, documentFilename }: ChatPanelProps) 
     onError(err) {
       if (err.message?.includes("daily_limit_reached")) {
         setChatError("You've reached your daily limit of 50 queries. Resets at midnight.");
+        setRateLimitRemaining(0);
+      } else if (err.message?.includes("rate_limit") || err.message?.includes("429")) {
+        setChatError("Too many requests. Please wait a moment and try again.");
+      } else if (err.message?.includes("Conversation not found")) {
+        setChatError("This conversation could not be found. Try refreshing the page.");
       } else {
         setChatError(err.message || "Something went wrong. Please try again.");
       }
     },
     onFinish() {
       setChatError(null);
-      fetch(`/api/conversations/${conversationId}/messages`)
-        .then((res) => res.json())
-        .then((data) => {
-          setHistory(data.messages);
-          const citMap: Record<string, Citation[]> = {};
-          for (const msg of data.messages) {
-            if (msg.role === "assistant" && msg.sources) {
-              citMap[msg.id] = msg.sources;
-            }
+      // Refresh messages and rate limit after each successful query
+      Promise.all([
+        fetch(`/api/conversations/${conversationId}/messages`).then((r) => r.json()),
+        fetch("/api/rate-limit").then((r) => r.json()),
+      ]).then(([msgData, rateLimitData]) => {
+        setHistory(msgData.messages);
+        const citMap: Record<string, Citation[]> = {};
+        for (const msg of msgData.messages) {
+          if (msg.role === "assistant" && msg.sources) {
+            citMap[msg.id] = msg.sources;
           }
-          setCitations(citMap);
-        });
+        }
+        setCitations(citMap);
+        setRateLimitRemaining(rateLimitData.remaining ?? null);
+      });
     },
   });
 
@@ -137,13 +161,23 @@ export function ChatPanel({ conversationId, documentFilename }: ChatPanelProps) 
     });
   }
 
-  async function handleSubmit(e: React.FormEvent) {
-    e.preventDefault();
-    if (!inputValue.trim() || isLoading) return;
+  async function submitMessage(text: string) {
+    if (!text.trim() || isLoading) return;
     setChatError(null);
-    const text = inputValue;
     setInputValue("");
     await sendMessage({ text });
+  }
+
+  async function handleSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    await submitMessage(inputValue);
+  }
+
+  function handleKeyDown(e: React.KeyboardEvent<HTMLInputElement>) {
+    if ((e.metaKey || e.ctrlKey) && e.key === "Enter") {
+      e.preventDefault();
+      submitMessage(inputValue);
+    }
   }
 
   async function handleModelChange(model: ModelKey) {
@@ -155,6 +189,8 @@ export function ChatPanel({ conversationId, documentFilename }: ChatPanelProps) 
     });
   }
 
+  const isNearLimit = rateLimitRemaining !== null && rateLimitRemaining <= 10;
+
   return (
     <div className="flex h-full flex-col">
       {/* Header */}
@@ -162,7 +198,14 @@ export function ChatPanel({ conversationId, documentFilename }: ChatPanelProps) 
         <p className="text-sm text-muted-foreground">
           Chatting with <span className="text-foreground font-medium">{documentFilename}</span>
         </p>
-        <ModelSelector currentModel={currentModel} onSelect={handleModelChange} />
+        <div className="flex items-center gap-3">
+          {rateLimitRemaining !== null && (
+            <span className={`text-xs ${isNearLimit ? "text-destructive" : "text-muted-foreground"}`}>
+              {rateLimitRemaining}/{DAILY_LIMIT} queries left today
+            </span>
+          )}
+          <ModelSelector currentModel={currentModel} onSelect={handleModelChange} />
+        </div>
       </div>
 
       {/* Messages */}
@@ -173,16 +216,10 @@ export function ChatPanel({ conversationId, documentFilename }: ChatPanelProps) 
               Ask a question about this document to get started.
             </p>
             <div className="flex flex-wrap justify-center gap-2">
-              {[
-                "What is this document about?",
-                "Summarize the key points",
-                "What are the main conclusions?",
-              ].map((q) => (
+              {STARTER_QUESTIONS.map((q) => (
                 <button
                   key={q}
-                  onClick={() => {
-                    setInputValue(q);
-                  }}
+                  onClick={() => submitMessage(q)}
                   className="rounded-full border border-border px-3 py-1.5 text-xs text-muted-foreground hover:bg-secondary hover:text-foreground transition-colors"
                 >
                   {q}
@@ -256,16 +293,26 @@ export function ChatPanel({ conversationId, documentFilename }: ChatPanelProps) 
       <div className="border-t border-border p-4">
         <form onSubmit={handleSubmit} className="flex gap-3">
           <input
+            ref={inputRef}
             value={inputValue}
             onChange={(e) => setInputValue(e.target.value)}
-            placeholder="Ask a question about this document..."
+            onKeyDown={handleKeyDown}
+            placeholder="Ask a question about this document…"
             className="flex-1 rounded-lg border border-border bg-input px-4 py-2.5 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring"
-            disabled={isLoading}
+            disabled={isLoading || rateLimitRemaining === 0}
           />
-          <Button type="submit" loading={isLoading} disabled={!inputValue.trim()}>
+          <Button
+            type="submit"
+            loading={isLoading}
+            disabled={!inputValue.trim() || rateLimitRemaining === 0}
+            title="Send (Cmd+Enter)"
+          >
             Send
           </Button>
         </form>
+        <p className="mt-1.5 text-xs text-muted-foreground text-right">
+          Cmd+Enter to send
+        </p>
       </div>
     </div>
   );
