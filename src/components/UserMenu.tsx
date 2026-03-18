@@ -2,7 +2,6 @@
 
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
-import { Button } from "@/components/ui/button";
 
 interface UserMenuProps {
   email: string;
@@ -20,52 +19,40 @@ export function UserMenu({ email, isAnonymous }: UserMenuProps) {
   }
 
   return (
-    <div className="border-t border-border p-3 space-y-2">
-      <div className="flex items-center gap-3 px-1">
-        <div className="flex h-7 w-7 items-center justify-center rounded-full bg-primary text-xs font-bold text-primary-foreground">
+    <div className="border-t border-border p-3">
+      <div className="flex items-center gap-2.5">
+        <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-hover text-[10px] font-medium text-muted-foreground">
           {isAnonymous ? "G" : (email[0]?.toUpperCase() ?? "?")}
         </div>
         <div className="flex-1 min-w-0">
-          <p className="truncate text-sm text-foreground">
+          <p className="truncate text-xs text-foreground/80">
             {isAnonymous ? "Guest" : email}
           </p>
-          {isAnonymous && (
-            <p className="text-xs text-muted-foreground truncate">
-              Sign up to save your work
-            </p>
-          )}
         </div>
-      </div>
-      <div className="flex gap-2">
-        {isAnonymous ? (
-          <>
-            <Button
-              variant="primary"
-              size="sm"
-              className="flex-1"
+        <div className="flex gap-1">
+          {isAnonymous ? (
+            <button
               onClick={() => router.push("/signup")}
+              className="text-[10px] text-muted-foreground hover:text-foreground transition-colors"
             >
-              Create account
-            </Button>
-            <Button variant="ghost" size="sm" onClick={handleSignOut}>
-              Sign out
-            </Button>
-          </>
-        ) : (
-          <>
-            <Button
-              variant="ghost"
-              size="sm"
-              className="flex-1"
+              Sign up
+            </button>
+          ) : (
+            <button
               onClick={() => router.push("/settings")}
+              className="text-[10px] text-muted-foreground hover:text-foreground transition-colors"
             >
               Settings
-            </Button>
-            <Button variant="ghost" size="sm" className="flex-1" onClick={handleSignOut}>
-              Sign out
-            </Button>
-          </>
-        )}
+            </button>
+          )}
+          <span className="text-muted-foreground/30">·</span>
+          <button
+            onClick={handleSignOut}
+            className="text-[10px] text-muted-foreground hover:text-foreground transition-colors"
+          >
+            {isAnonymous ? "Exit" : "Log out"}
+          </button>
+        </div>
       </div>
     </div>
   );

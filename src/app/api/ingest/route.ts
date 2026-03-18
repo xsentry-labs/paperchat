@@ -1,9 +1,7 @@
 import { NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { chunkText } from "@/lib/chunker";
-import { embedBatch } from "@/lib/embeddings";
+import { ingestDocument } from "@/lib/ingest";
 
-// Allow up to 60s for large documents
 export const maxDuration = 60;
 
 export async function POST(request: Request) {
@@ -22,80 +20,12 @@ export async function POST(request: Request) {
     );
   }
 
-  const admin = createAdminClient();
-
   try {
-    // Update status to processing
-    await admin
-      .from("documents")
-      .update({ status: "processing", updated_at: new Date().toISOString() })
-      .eq("id", document_id);
-
-    // Fetch document metadata
-    const { data: doc, error: docError } = await admin
-      .from("documents")
-      .select("*")
-      .eq("id", document_id)
-      .single();
-
-    if (docError || !doc) {
-      throw new Error(`Document not found: ${docError?.message}`);
-    }
-
-    // Download file from storage
-    const { data: fileData, error: downloadError } = await admin.storage
-      .from("documents")
-      .download(doc.storage_path);
-
-    if (downloadError || !fileData) {
-      throw new Error(`Download failed: ${downloadError?.message}`);
-    }
-
-    // Parse document based on mime type
-    const parsedContent = await parseDocument(fileData, doc.mime_type);
-
-    // Chunk the text
-    const chunks = chunkText(parsedContent.text, parsedContent.pages);
-
-    if (chunks.length === 0) {
-      throw new Error("No content could be extracted from document");
-    }
-
-    // Embed all chunks
-    const embeddings = await embedBatch(chunks.map((c) => c.content));
-
-    // Insert chunks into database
-    const chunkRows = chunks.map((chunk, i) => ({
-      document_id,
-      content: chunk.content,
-      embedding: JSON.stringify(embeddings[i]),
-      chunk_index: chunk.chunkIndex,
-      metadata: chunk.metadata,
-    }));
-
-    // Insert in batches of 50
-    for (let i = 0; i < chunkRows.length; i += 50) {
-      const batch = chunkRows.slice(i, i + 50);
-      const { error: insertError } = await admin.from("chunks").insert(batch);
-      if (insertError) {
-        throw new Error(`Chunk insert failed: ${insertError.message}`);
-      }
-    }
-
-    // Update document status to ready
-    await admin
-      .from("documents")
-      .update({ status: "ready", updated_at: new Date().toISOString() })
-      .eq("id", document_id);
-
-    return NextResponse.json({
-      success: true,
-      chunks: chunks.length,
-    });
+    const result = await ingestDocument(document_id);
+    return NextResponse.json({ success: true, chunks: result.chunks });
   } catch (err) {
     const message = err instanceof Error ? err.message : "Unknown error";
-
-    // Update document status to error
+    const admin = createAdminClient();
     await admin
       .from("documents")
       .update({
@@ -107,65 +37,4 @@ export async function POST(request: Request) {
 
     return NextResponse.json({ error: message }, { status: 500 });
   }
-}
-
-interface ParsedDocument {
-  text: string;
-  pages?: { text: string; page: number }[];
-}
-
-async function parseDocument(
-  blob: Blob,
-  mimeType: string
-): Promise<ParsedDocument> {
-  switch (mimeType) {
-    case "application/pdf":
-      return parsePdf(blob);
-    case "application/vnd.openxmlformats-officedocument.wordprocessingml.document":
-      return parseDocx(blob);
-    case "text/plain":
-    case "text/markdown":
-      return { text: await blob.text() };
-    default:
-      throw new Error(`Unsupported file type: ${mimeType}`);
-  }
-}
-
-async function parsePdf(blob: Blob): Promise<ParsedDocument> {
-  // eslint-disable-next-line @typescript-eslint/no-require-imports
-  const pdfParse = require("pdf-parse");
-  const buffer = Buffer.from(await blob.arrayBuffer());
-
-  // Capture per-page text via the pagerender callback
-  const pageTexts: string[] = [];
-  const options = {
-    pagerender: function (pageData: {
-      pageIndex: number;
-      getTextContent: () => Promise<{ items: { str: string; hasEOL?: boolean }[] }>;
-    }) {
-      return pageData.getTextContent().then(function (textContent) {
-        const text = textContent.items
-          .map((item) => item.str + (item.hasEOL ? "\n" : " "))
-          .join("");
-        pageTexts[pageData.pageIndex] = text;
-        return text;
-      });
-    },
-  };
-
-  const result = await pdfParse(buffer, options);
-
-  const pages =
-    pageTexts.length > 0
-      ? pageTexts.map((text, i) => ({ text: text || "", page: i + 1 }))
-      : [{ text: result.text, page: 1 }];
-
-  return { text: result.text, pages };
-}
-
-async function parseDocx(blob: Blob): Promise<ParsedDocument> {
-  const mammoth = await import("mammoth");
-  const buffer = Buffer.from(await blob.arrayBuffer());
-  const result = await mammoth.extractRawText({ buffer });
-  return { text: result.value };
 }

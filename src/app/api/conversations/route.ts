@@ -35,20 +35,17 @@ export async function POST(request: Request) {
 
   const { document_id, title } = await request.json();
 
-  if (!document_id) {
-    return NextResponse.json(
-      { error: "document_id required" },
-      { status: 400 }
-    );
+  const insert: Record<string, unknown> = {
+    user_id: user.id,
+    title: title || "New conversation",
+  };
+  if (document_id) {
+    insert.document_id = document_id;
   }
 
   const { data: conversation, error } = await supabase
     .from("conversations")
-    .insert({
-      user_id: user.id,
-      document_id,
-      title: title || "New conversation",
-    })
+    .insert(insert)
     .select()
     .single();
 

@@ -2,6 +2,9 @@ import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { ACCEPTED_FILE_TYPES, MAX_FILE_SIZE } from "@/lib/constants";
+import { ingestDocument } from "@/lib/ingest";
+
+export const maxDuration = 60;
 
 export async function POST(request: Request) {
   // Verify auth
@@ -80,26 +83,20 @@ export async function POST(request: Request) {
     );
   }
 
-  // Trigger ingestion asynchronously (fire and forget)
-  const ingestUrl = new URL("/api/ingest", request.url).toString();
-  fetch(ingestUrl, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${process.env.SUPABASE_SERVICE_ROLE_KEY}`,
-    },
-    body: JSON.stringify({ document_id: doc.id }),
-  }).catch(async () => {
-    // If the fetch itself fails to reach the ingest route, mark document as failed
+  // Run ingestion directly (awaited — blocks response until done)
+  try {
+    await ingestDocument(doc.id);
+  } catch (err) {
+    console.error("[upload] Ingest failed:", err);
     await admin
       .from("documents")
       .update({
         status: "error",
-        error_message: "Failed to start processing. Please try deleting and re-uploading.",
+        error_message: err instanceof Error ? err.message : "Processing failed",
         updated_at: new Date().toISOString(),
       })
       .eq("id", doc.id);
-  });
+  }
 
   return NextResponse.json({ document: doc }, { status: 201 });
 }

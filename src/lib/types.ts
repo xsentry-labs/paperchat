@@ -16,6 +16,7 @@ export interface Document {
   size_bytes: number;
   status: DocumentStatus;
   error_message: string | null;
+  summary: string | null;
   created_at: string;
   updated_at: string;
 }

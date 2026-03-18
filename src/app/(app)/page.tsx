@@ -1,37 +1,95 @@
+"use client";
+
+import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
+import { ModelSelector } from "@/components/chat/ModelSelector";
+import type { ModelKey } from "@/lib/llm";
+
 export default function HomePage() {
+  const [input, setInput] = useState("");
+  const [loading, setLoading] = useState(false);
+  const [currentModel, setCurrentModel] = useState<ModelKey>("fast");
+  const router = useRouter();
+
+  useEffect(() => {
+    fetch("/api/profile").then(async (res) => {
+      if (res.ok) {
+        const { profile } = await res.json();
+        if (profile?.preferred_model) setCurrentModel(profile.preferred_model as ModelKey);
+      }
+    });
+  }, []);
+
+  function handleModelChange(model: ModelKey) {
+    setCurrentModel(model);
+    fetch("/api/profile", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ preferred_model: model }),
+    });
+  }
+
+  async function handleSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    const text = input.trim();
+    if (!text || loading) return;
+    setLoading(true);
+
+    const res = await fetch("/api/conversations", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ title: text.slice(0, 60) }),
+    });
+
+    if (res.ok) {
+      const data = await res.json();
+      router.push(`/chat/${data.conversation.id}?q=${encodeURIComponent(text)}`);
+    } else {
+      setLoading(false);
+    }
+  }
+
   return (
-    <div className="flex h-full flex-col items-center justify-center text-center px-6">
-      <div className="max-w-lg space-y-6">
-        <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-2xl bg-primary/10">
-          <svg
-            className="h-8 w-8 text-primary"
-            fill="none"
-            viewBox="0 0 24 24"
-            stroke="currentColor"
-            strokeWidth={1.5}
-          >
-            <path
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              d="M19.5 14.25v-2.625a3.375 3.375 0 00-3.375-3.375h-1.5A1.125 1.125 0 0113.5 7.125v-1.5a3.375 3.375 0 00-3.375-3.375H8.25m0 12.75h7.5m-7.5 3H12M10.5 2.25H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 00-9-9z"
-            />
-          </svg>
-        </div>
-        <div className="space-y-2">
-          <h2 className="text-2xl font-semibold text-foreground">
-            Welcome to paperchat
+    <div className="flex h-full flex-col items-center justify-center">
+      <div className="w-full max-w-xl px-4 space-y-6">
+        <div className="text-center space-y-2">
+          <h2 className="text-lg font-medium text-foreground tracking-tight">
+            paperchat
           </h2>
-          <p className="text-muted-foreground">
-            Upload a document from the sidebar, then click it to start a
-            conversation. Ask questions and get cited answers powered by AI.
+          <p className="text-xs text-muted-foreground/50">
+            Ask anything. Upload documents for grounded answers.
           </p>
         </div>
-        <div className="flex flex-wrap justify-center gap-3 text-xs text-muted-foreground">
-          <span className="rounded-full border border-border px-3 py-1">PDF</span>
-          <span className="rounded-full border border-border px-3 py-1">TXT</span>
-          <span className="rounded-full border border-border px-3 py-1">Markdown</span>
-          <span className="rounded-full border border-border px-3 py-1">DOCX</span>
-        </div>
+
+        <form onSubmit={handleSubmit} className="relative">
+          <input
+            value={input}
+            onChange={(e) => setInput(e.target.value)}
+            placeholder="Ask a question..."
+            autoFocus
+            className="w-full rounded-xl border border-border/60 bg-transparent pl-4 pr-36 py-3.5 text-sm text-foreground placeholder:text-muted-foreground/30 focus:outline-none focus:border-border transition-colors"
+            disabled={loading}
+          />
+          <div className="absolute right-3 top-1/2 -translate-y-1/2 flex items-center gap-2">
+            <ModelSelector currentModel={currentModel} onSelect={handleModelChange} />
+            <button
+              type="submit"
+              disabled={!input.trim() || loading}
+              className="flex h-7 w-7 items-center justify-center rounded-lg bg-foreground text-background transition-all duration-150 hover:bg-foreground/80 disabled:opacity-20 disabled:cursor-not-allowed"
+            >
+              {loading ? (
+                <svg className="h-3 w-3 animate-spin" viewBox="0 0 24 24" fill="none">
+                  <circle className="opacity-20" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="3" />
+                  <path className="opacity-80" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+                </svg>
+              ) : (
+                <svg className="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M4.5 10.5L12 3m0 0l7.5 7.5M12 3v18" />
+                </svg>
+              )}
+            </button>
+          </div>
+        </form>
       </div>
     </div>
   );
