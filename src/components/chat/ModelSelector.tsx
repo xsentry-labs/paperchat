@@ -14,6 +14,7 @@ export function ModelSelector({ currentModel, onSelect }: ModelSelectorProps) {
   return (
     <div className="relative">
       <button
+        type="button"
         onClick={() => setOpen(!open)}
         className="flex items-center gap-1.5 rounded-md px-2 py-1 text-[11px] text-muted-foreground hover:text-foreground hover:bg-hover transition-all duration-150"
       >
@@ -29,6 +30,7 @@ export function ModelSelector({ currentModel, onSelect }: ModelSelectorProps) {
           <div className="absolute right-0 bottom-full z-20 mb-1 w-52 rounded-lg border border-border bg-card shadow-xl shadow-black/20 py-1 animate-fade-in">
             {(Object.entries(MODELS) as [ModelKey, typeof MODELS[ModelKey]][]).map(([key, model]) => (
               <button
+                type="button"
                 key={key}
                 onClick={() => { onSelect(key); setOpen(false); }}
                 className={`flex w-full flex-col px-3 py-2 text-left transition-colors hover:bg-hover ${
