@@ -4,10 +4,12 @@ import { ChatPanel } from "@/components/chat/ChatPanel";
 
 interface ChatPageProps {
   params: Promise<{ id: string }>;
+  searchParams: Promise<{ q?: string }>;
 }
 
-export default async function ChatPage({ params }: ChatPageProps) {
+export default async function ChatPage({ params, searchParams }: ChatPageProps) {
   const { id } = await params;
+  const { q: initialQuestion } = await searchParams;
   const supabase = await createClient();
   const {
     data: { user },
@@ -17,7 +19,6 @@ export default async function ChatPage({ params }: ChatPageProps) {
     redirect("/login");
   }
 
-  // Fetch conversation with document info
   const { data: conversation, error } = await supabase
     .from("conversations")
     .select("*, documents(filename, status)")
@@ -28,11 +29,10 @@ export default async function ChatPage({ params }: ChatPageProps) {
     redirect("/");
   }
 
+  // If scoped to a document, check it's ready
   const doc = conversation.documents as { filename: string; status: string } | null;
-  const filename = doc?.filename ?? "Unknown document";
-  const isReady = doc?.status === "ready";
 
-  if (!isReady) {
+  if (doc && doc.status !== "ready") {
     return (
       <div className="flex h-full flex-col items-center justify-center text-center">
         <div className="max-w-md space-y-4">
@@ -40,7 +40,7 @@ export default async function ChatPage({ params }: ChatPageProps) {
             Document still processing
           </h2>
           <p className="text-muted-foreground">
-            <strong>{filename}</strong> is still being indexed. You can chat once
+            <strong>{doc.filename}</strong> is still being indexed. You can chat once
             processing is complete.
           </p>
         </div>
@@ -48,5 +48,7 @@ export default async function ChatPage({ params }: ChatPageProps) {
     );
   }
 
-  return <ChatPanel conversationId={id} documentFilename={filename} />;
+  const label = doc?.filename ?? "All documents";
+
+  return <ChatPanel conversationId={id} documentFilename={label} initialQuestion={initialQuestion} />;
 }

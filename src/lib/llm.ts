@@ -2,36 +2,37 @@ import { createOpenAI } from "@ai-sdk/openai";
 
 export const MODELS = {
   fast: {
-    id: "openai/gpt-4.1-mini",
+    id: "gpt-4.1-mini",
     label: "GPT-4.1 mini",
-    description: "Fast and cheap — default",
+    description: "Fast, everyday queries",
   },
   quality: {
-    id: "anthropic/claude-haiku-4-5",
-    label: "Claude Haiku 4.5",
-    description: "Best citation accuracy",
+    id: "gpt-4.1",
+    label: "GPT-4.1",
+    description: "Best accuracy",
   },
-  longdoc: {
-    id: "google/gemini-2.5-flash",
-    label: "Gemini 2.5 Flash",
-    description: "Many large documents",
+  nano: {
+    id: "gpt-4.1-nano",
+    label: "GPT-4.1 nano",
+    description: "Lightweight, quick answers",
+  },
+  latest: {
+    id: "gpt-5.4-mini-2026-03-17",
+    label: "GPT-5.4 mini",
+    description: "Latest model",
   },
 } as const;
 
 export type ModelKey = keyof typeof MODELS;
 
-/**
- * Create an OpenRouter-compatible provider using Vercel AI SDK.
- */
 export function createLLMProvider() {
   return createOpenAI({
-    baseURL: "https://openrouter.ai/api/v1",
-    apiKey: process.env.OPENROUTER_API_KEY,
+    apiKey: process.env.OPENAI_API_KEY,
   });
 }
 
-export const SYSTEM_PROMPT = `You are a document assistant. Answer ONLY from the provided context.
-Reference sources inline as [1], [2], etc. matching the context block numbers.
-Each reference must correspond to a real context block.
-If the answer is not in the context, say "I couldn't find that in your documents."
-Never answer from outside knowledge.`;
+export const SYSTEM_PROMPT = `You are a helpful, general-purpose assistant. You can answer questions on any topic using your own knowledge.
+
+When document context blocks are provided below, use them to give grounded answers and cite sources inline as [1], [2], etc. matching the context block numbers. Prefer document context over your own knowledge when it is relevant. Do not mention having "access" to documents or describe which blocks you have — just answer naturally.
+
+If no document context is provided, or the context is not relevant to the question, answer freely using your general knowledge. Be direct and concise.`;

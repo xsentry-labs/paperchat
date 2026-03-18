@@ -1,23 +1,24 @@
 @import "tailwindcss";
 
 :root {
-  --background: #0f1117;
-  --foreground: #e4e4e7;
-  --card: #1a1b23;
-  --card-foreground: #e4e4e7;
-  --border: #2e2e38;
-  --input: #2e2e38;
-  --primary: #6366f1;
-  --primary-foreground: #ffffff;
-  --secondary: #1e1f2a;
-  --secondary-foreground: #a1a1aa;
-  --destructive: #ef4444;
+  --background: #0d0d0d;
+  --foreground: #ececec;
+  --card: #141414;
+  --card-foreground: #ececec;
+  --border: rgba(255, 255, 255, 0.06);
+  --input: #1a1a1a;
+  --primary: #ececec;
+  --primary-foreground: #0d0d0d;
+  --secondary: rgba(255, 255, 255, 0.04);
+  --secondary-foreground: #a0a0a0;
+  --destructive: #e5484d;
   --destructive-foreground: #ffffff;
-  --muted: #1e1f2a;
-  --muted-foreground: #71717a;
-  --accent: #6366f1;
-  --ring: #6366f1;
-  --sidebar: #13141b;
+  --muted: #1a1a1a;
+  --muted-foreground: #666666;
+  --accent: #ececec;
+  --ring: rgba(255, 255, 255, 0.12);
+  --sidebar: #0a0a0a;
+  --hover: rgba(255, 255, 255, 0.05);
 }
 
 @theme inline {
@@ -38,40 +39,47 @@
   --color-accent: var(--accent);
   --color-ring: var(--ring);
   --color-sidebar: var(--sidebar);
+  --color-hover: var(--hover);
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
+}
+
+* {
+  border-color: var(--border);
 }
 
 body {
   background: var(--background);
   color: var(--foreground);
-  font-family: var(--font-sans), system-ui, sans-serif;
+  font-family: var(--font-sans), system-ui, -apple-system, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
 }
 
-/* Scrollbar styling */
-::-webkit-scrollbar {
-  width: 6px;
-}
+/* Scrollbar */
+::-webkit-scrollbar { width: 4px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.08); border-radius: 4px; }
+::-webkit-scrollbar-thumb:hover { background: rgba(255,255,255,0.14); }
 
-::-webkit-scrollbar-track {
-  background: var(--background);
-}
-
-::-webkit-scrollbar-thumb {
-  background: var(--border);
-  border-radius: 3px;
-}
-
-::-webkit-scrollbar-thumb:hover {
-  background: var(--muted-foreground);
-}
-
-/* Pulse animation for status dots */
+/* Animations */
 @keyframes pulse-dot {
   0%, 100% { opacity: 1; }
-  50% { opacity: 0.5; }
+  50% { opacity: 0.4; }
 }
-
 .animate-pulse-dot {
   animation: pulse-dot 2s ease-in-out infinite;
+}
+
+@keyframes fade-in {
+  from { opacity: 0; transform: translateY(4px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+.animate-fade-in {
+  animation: fade-in 0.3s ease-out;
+}
+
+/* Selection */
+::selection {
+  background: rgba(255, 255, 255, 0.15);
 }

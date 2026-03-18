@@ -60,7 +60,7 @@ export async function POST(request: Request) {
     );
   }
 
-  // Get conversation to find scoped doc IDs
+  // Get conversation
   const { data: conversation, error: convError } = await supabase
     .from("conversations")
     .select("document_id")
@@ -85,17 +85,19 @@ export async function POST(request: Request) {
       ? (profile.preferred_model as ModelKey)
       : "fast";
 
-  // Retrieve relevant chunks
-  const docIds = [conversation.document_id];
+  // Retrieve relevant chunks (empty array = search all user's docs)
+  const docIds = conversation.document_id ? [conversation.document_id] : [];
   const chunks = await retrieveChunks(question, docIds, user.id);
 
-  // Build context string
+  // Build context string (may be empty if no docs uploaded)
   const contextBlocks = chunks
     .map(
       (chunk: RetrievedChunk, i: number) =>
         `[${i + 1}] (${chunk.filename}, p.${chunk.page ?? "?"})\n${chunk.content}`
     )
     .join("\n\n");
+
+  const hasContext = chunks.length > 0;
 
   // Save user message
   const admin = createAdminClient();
@@ -115,7 +117,9 @@ export async function POST(request: Request) {
     messages: [
       {
         role: "user",
-        content: `Context:\n${contextBlocks}\n\nQuestion: ${question}`,
+        content: hasContext
+          ? `Context:\n${contextBlocks}\n\nQuestion: ${question}`
+          : question,
       },
     ],
     async onFinish({ text }) {
@@ -134,7 +138,7 @@ export async function POST(request: Request) {
             documentId: chunk.documentId,
             filename: chunk.filename,
             page: chunk.page,
-            quote: chunk.content.slice(0, 200),
+            quote: chunk.content.slice(0, 500),
           };
         });
 

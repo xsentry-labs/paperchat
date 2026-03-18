@@ -1,8 +1,7 @@
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { UserMenu } from "@/components/UserMenu";
-import { FileExplorer } from "@/components/file-explorer/FileExplorer";
-import { ConversationList } from "@/components/chat/ConversationList";
+import { Sidebar } from "@/components/Sidebar";
 
 export default async function AppLayout({
   children,
@@ -20,22 +19,19 @@ export default async function AppLayout({
 
   return (
     <div className="flex h-screen">
-      {/* Sidebar */}
-      <aside className="flex w-72 flex-col border-r border-border bg-sidebar">
-        <div className="flex h-14 items-center border-b border-border px-4">
-          <h1 className="text-lg font-semibold text-foreground">paperchat</h1>
+      <aside className="flex w-64 shrink-0 flex-col bg-sidebar">
+        <div className="flex h-12 items-center px-4">
+          <span className="text-sm font-semibold tracking-tight text-foreground">paperchat</span>
         </div>
 
-        <div className="flex-1 overflow-y-auto">
-          <FileExplorer />
-          <ConversationList />
+        <div className="flex-1 overflow-hidden">
+          <Sidebar />
         </div>
 
         <UserMenu email={user.email ?? ""} isAnonymous={(user as { is_anonymous?: boolean }).is_anonymous ?? false} />
       </aside>
 
-      {/* Main content */}
-      <main className="flex-1 overflow-y-auto">{children}</main>
+      <main className="flex-1 min-w-0 min-h-0 overflow-hidden bg-background">{children}</main>
     </div>
   );
 }
