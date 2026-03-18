@@ -13,6 +13,7 @@ export default function LoginPage() {
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+  const [guestLoading, setGuestLoading] = useState(false);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -31,6 +32,20 @@ export default function LoginPage() {
       return;
     }
 
+    router.push("/");
+    router.refresh();
+  }
+
+  async function handleGuestSignIn() {
+    setError(null);
+    setGuestLoading(true);
+    const supabase = createClient();
+    const { error } = await supabase.auth.signInAnonymously();
+    if (error) {
+      setError(error.message);
+      setGuestLoading(false);
+      return;
+    }
     router.push("/");
     router.refresh();
   }
@@ -55,11 +70,33 @@ export default function LoginPage() {
         onChange={(e) => setPassword(e.target.value)}
         required
       />
+      <div className="flex justify-end">
+        <Link href="/forgot-password" className="text-xs text-muted-foreground hover:text-foreground">
+          Forgot password?
+        </Link>
+      </div>
       {error && (
         <p className="text-sm text-destructive">{error}</p>
       )}
       <Button type="submit" loading={loading} className="w-full">
         Sign in
+      </Button>
+      <div className="relative">
+        <div className="absolute inset-0 flex items-center">
+          <span className="w-full border-t border-border" />
+        </div>
+        <div className="relative flex justify-center text-xs">
+          <span className="bg-card px-2 text-muted-foreground">or</span>
+        </div>
+      </div>
+      <Button
+        type="button"
+        variant="secondary"
+        loading={guestLoading}
+        onClick={handleGuestSignIn}
+        className="w-full"
+      >
+        Continue as guest
       </Button>
       <p className="text-center text-sm text-muted-foreground">
         Don&apos;t have an account?{" "}

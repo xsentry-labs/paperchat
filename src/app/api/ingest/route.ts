@@ -135,15 +135,32 @@ async function parsePdf(blob: Blob): Promise<ParsedDocument> {
   // eslint-disable-next-line @typescript-eslint/no-require-imports
   const pdfParse = require("pdf-parse");
   const buffer = Buffer.from(await blob.arrayBuffer());
-  const result = await pdfParse(buffer);
 
-  // pdf-parse gives us the full text; attempt page-level extraction
-  // The numpages property tells us page count
-  // For now return as plain text (pdf-parse doesn't expose per-page text easily)
-  return {
-    text: result.text,
-    pages: [{ text: result.text, page: 1 }],
+  // Capture per-page text via the pagerender callback
+  const pageTexts: string[] = [];
+  const options = {
+    pagerender: function (pageData: {
+      pageIndex: number;
+      getTextContent: () => Promise<{ items: { str: string; hasEOL?: boolean }[] }>;
+    }) {
+      return pageData.getTextContent().then(function (textContent) {
+        const text = textContent.items
+          .map((item) => item.str + (item.hasEOL ? "\n" : " "))
+          .join("");
+        pageTexts[pageData.pageIndex] = text;
+        return text;
+      });
+    },
   };
+
+  const result = await pdfParse(buffer, options);
+
+  const pages =
+    pageTexts.length > 0
+      ? pageTexts.map((text, i) => ({ text: text || "", page: i + 1 }))
+      : [{ text: result.text, page: 1 }];
+
+  return { text: result.text, pages };
 }
 
 async function parseDocx(blob: Blob): Promise<ParsedDocument> {

@@ -89,8 +89,16 @@ export async function POST(request: Request) {
       Authorization: `Bearer ${process.env.SUPABASE_SERVICE_ROLE_KEY}`,
     },
     body: JSON.stringify({ document_id: doc.id }),
-  }).catch(() => {
-    // Ingest failure is handled within the ingest route itself
+  }).catch(async () => {
+    // If the fetch itself fails to reach the ingest route, mark document as failed
+    await admin
+      .from("documents")
+      .update({
+        status: "error",
+        error_message: "Failed to start processing. Please try deleting and re-uploading.",
+        updated_at: new Date().toISOString(),
+      })
+      .eq("id", doc.id);
   });
 
   return NextResponse.json({ document: doc }, { status: 201 });
