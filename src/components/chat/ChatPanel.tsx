@@ -206,10 +206,10 @@ export function ChatPanel({ conversationId, initialQuestion }: ChatPanelProps) {
     <div className="flex h-full flex-col">
       {/* Messages */}
       <div ref={scrollRef} className="flex-1 overflow-y-auto">
-        <div className="mx-auto max-w-2xl px-4 py-6 space-y-6">
+        <div className="mx-auto max-w-2xl px-3 sm:px-4 py-4 sm:py-6 space-y-4 sm:space-y-6">
           {displayMessages.length === 0 && (
-            <div className="flex flex-col items-center justify-center pt-32 gap-6">
-              <p className="text-sm text-muted-foreground/60">
+            <div className="flex flex-col items-center justify-center pt-20 sm:pt-32 gap-4 sm:gap-6 px-2">
+              <p className="text-sm text-muted-foreground/60 text-center">
                 Ask anything about your documents.
               </p>
               <div className="flex flex-wrap justify-center gap-2">
@@ -217,7 +217,7 @@ export function ChatPanel({ conversationId, initialQuestion }: ChatPanelProps) {
                   <button
                     key={q}
                     onClick={() => submitMessage(q)}
-                    className="rounded-full border border-border/60 px-3.5 py-1.5 text-[11px] text-muted-foreground hover:text-foreground hover:border-border hover:bg-hover transition-all duration-150"
+                    className="rounded-full border border-border/60 px-3 sm:px-3.5 py-1.5 text-[11px] text-muted-foreground hover:text-foreground hover:border-border hover:bg-hover transition-all duration-150"
                   >
                     {q}
                   </button>
@@ -232,7 +232,7 @@ export function ChatPanel({ conversationId, initialQuestion }: ChatPanelProps) {
               <div key={msg.id || i} className="animate-fade-in">
                 {msg.role === "user" ? (
                   <div className="flex justify-end">
-                    <div className="max-w-[80%] rounded-2xl bg-hover px-4 py-2.5 text-sm text-foreground break-words overflow-hidden">
+                    <div className="max-w-[85%] sm:max-w-[80%] rounded-2xl bg-hover px-3 sm:px-4 py-2 sm:py-2.5 text-sm text-foreground break-words overflow-hidden">
                       {content}
                     </div>
                   </div>
@@ -275,7 +275,7 @@ export function ChatPanel({ conversationId, initialQuestion }: ChatPanelProps) {
 
       {/* Input area */}
       <div className="border-t border-border/50">
-        <div className="mx-auto max-w-2xl px-4 py-3">
+        <div className="mx-auto max-w-2xl px-3 sm:px-4 py-2 sm:py-3">
           <form onSubmit={handleSubmit} className="relative">
             <input
               ref={inputRef}
@@ -283,11 +283,13 @@ export function ChatPanel({ conversationId, initialQuestion }: ChatPanelProps) {
               onChange={(e) => setInputValue(e.target.value)}
               onKeyDown={(e) => { if ((e.metaKey || e.ctrlKey) && e.key === "Enter") { e.preventDefault(); submitMessage(inputValue); } }}
               placeholder="Ask a question..."
-              className="w-full rounded-xl border border-border/60 bg-transparent pl-4 pr-36 py-3 text-sm text-foreground placeholder:text-muted-foreground/40 focus:outline-none focus:border-border transition-colors"
+              className="w-full rounded-xl border border-border/60 bg-transparent pl-3 sm:pl-4 pr-20 sm:pr-36 py-2.5 sm:py-3 text-sm text-foreground placeholder:text-muted-foreground/40 focus:outline-none focus:border-border transition-colors"
               disabled={isLoading || rateLimitRemaining === 0}
             />
-            <div className="absolute right-2 top-1/2 -translate-y-1/2 flex items-center gap-2">
-              <ModelSelector currentModel={currentModel} onSelect={handleModelChange} />
+            <div className="absolute right-2 top-1/2 -translate-y-1/2 flex items-center gap-1.5 sm:gap-2">
+              <div className="hidden sm:block">
+                <ModelSelector currentModel={currentModel} onSelect={handleModelChange} />
+              </div>
               <button
                 type="submit"
                 disabled={!inputValue.trim() || isLoading || rateLimitRemaining === 0}

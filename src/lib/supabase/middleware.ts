@@ -45,8 +45,9 @@ export async function updateSession(request: NextRequest) {
   }
 
   // Authenticated non-anonymous users shouldn't see auth pages
-  // Anonymous users can access signup to convert their account
-  if (user && !isAnonymous && isAuthRoute) {
+  // Exceptions: reset-password (needed after clicking email reset link) and signup for anonymous users
+  const isResetPassword = request.nextUrl.pathname.startsWith("/reset-password");
+  if (user && !isAnonymous && isAuthRoute && !isResetPassword) {
     const url = request.nextUrl.clone();
     url.pathname = "/";
     return NextResponse.redirect(url);

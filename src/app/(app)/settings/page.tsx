@@ -113,8 +113,8 @@ export default function SettingsPage() {
   }
 
   return (
-    <div className="mx-auto max-w-xl px-6 py-10 space-y-10">
-      <h1 className="text-2xl font-bold text-foreground">Settings</h1>
+    <div className="mx-auto max-w-xl px-4 sm:px-6 py-6 sm:py-10 space-y-8 sm:space-y-10">
+      <h1 className="text-xl sm:text-2xl font-bold text-foreground pl-10 md:pl-0">Settings</h1>
 
       {message && (
         <div className="rounded-lg border border-border bg-secondary px-4 py-3 text-sm text-foreground">
