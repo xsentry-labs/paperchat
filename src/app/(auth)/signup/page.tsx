@@ -11,6 +11,7 @@ export default function SignupPage() {
   const router = useRouter();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -27,6 +28,12 @@ export default function SignupPage() {
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setError(null);
+
+    if (password !== confirmPassword) {
+      setError("Passwords do not match.");
+      return;
+    }
+
     setLoading(true);
 
     const supabase = createClient();
@@ -130,6 +137,16 @@ export default function SignupPage() {
         placeholder="••••••••"
         value={password}
         onChange={(e) => setPassword(e.target.value)}
+        minLength={6}
+        required
+      />
+      <Input
+        id="confirm-password"
+        label="Confirm password"
+        type="password"
+        placeholder="••••••••"
+        value={confirmPassword}
+        onChange={(e) => setConfirmPassword(e.target.value)}
         minLength={6}
         required
       />

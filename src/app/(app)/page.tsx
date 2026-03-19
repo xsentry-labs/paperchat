@@ -50,8 +50,8 @@ export default function HomePage() {
   }
 
   return (
-    <div className="flex h-full flex-col items-center justify-center">
-      <div className="w-full max-w-xl px-4 space-y-6">
+    <div className="flex h-full flex-col items-center justify-center px-4">
+      <div className="w-full max-w-xl space-y-6">
         <div className="text-center space-y-2">
           <h2 className="text-lg font-medium text-foreground tracking-tight">
             paperchat
@@ -67,11 +67,13 @@ export default function HomePage() {
             onChange={(e) => setInput(e.target.value)}
             placeholder="Ask a question..."
             autoFocus
-            className="w-full rounded-xl border border-border/60 bg-transparent pl-4 pr-36 py-3.5 text-sm text-foreground placeholder:text-muted-foreground/30 focus:outline-none focus:border-border transition-colors"
+            className="w-full rounded-xl border border-border/60 bg-transparent pl-3 sm:pl-4 pr-20 sm:pr-36 py-3 sm:py-3.5 text-sm text-foreground placeholder:text-muted-foreground/30 focus:outline-none focus:border-border transition-colors"
             disabled={loading}
           />
-          <div className="absolute right-3 top-1/2 -translate-y-1/2 flex items-center gap-2">
-            <ModelSelector currentModel={currentModel} onSelect={handleModelChange} />
+          <div className="absolute right-2 sm:right-3 top-1/2 -translate-y-1/2 flex items-center gap-1.5 sm:gap-2">
+            <div className="hidden sm:block">
+              <ModelSelector currentModel={currentModel} onSelect={handleModelChange} />
+            </div>
             <button
               type="submit"
               disabled={!input.trim() || loading}

@@ -83,3 +83,23 @@ body {
 ::selection {
   background: rgba(255, 255, 255, 0.15);
 }
+
+/* Prevent overscroll bounce on mobile */
+html, body {
+  overscroll-behavior: none;
+}
+
+/* Safe area insets for notched devices */
+@supports (padding: env(safe-area-inset-bottom)) {
+  .safe-bottom {
+    padding-bottom: env(safe-area-inset-bottom);
+  }
+}
+
+/* Touch optimizations */
+@media (hover: none) {
+  /* Larger touch targets on touch devices */
+  button, [role="button"] {
+    min-height: 32px;
+  }
+}
