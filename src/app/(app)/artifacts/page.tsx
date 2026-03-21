@@ -17,15 +17,17 @@ const KnowledgeGraph = dynamic(
 type FolderType = "pdf" | "txt" | "md" | "docx" | "pptx" | "xlsx" | "html" | "epub";
 type TabType = "files" | "graph";
 
+const FOLDER_COLOR = "#71717a";
+
 const FOLDERS: { type: FolderType; label: string; mimeType: string; color: string }[] = [
-  { type: "pdf",  label: "PDFs",         mimeType: "application/pdf",                                                                                  color: "#e5484d" },
-  { type: "docx", label: "Word",          mimeType: "application/vnd.openxmlformats-officedocument.wordprocessingml.document",                          color: "#3b82f6" },
-  { type: "pptx", label: "Slides",        mimeType: "application/vnd.openxmlformats-officedocument.presentationml.presentation",                        color: "#f97316" },
-  { type: "xlsx", label: "Spreadsheets",  mimeType: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",                                color: "#22c55e" },
-  { type: "txt",  label: "Text",          mimeType: "text/plain",                                                                                       color: "#a0a0a0" },
-  { type: "md",   label: "Markdown",      mimeType: "text/markdown",                                                                                    color: "#a0a0a0" },
-  { type: "html", label: "HTML",          mimeType: "text/html",                                                                                        color: "#f59e0b" },
-  { type: "epub", label: "Books",         mimeType: "application/epub+zip",                                                                             color: "#a78bfa" },
+  { type: "pdf",  label: "PDFs",         mimeType: "application/pdf",                                                                                  color: FOLDER_COLOR },
+  { type: "docx", label: "Word",          mimeType: "application/vnd.openxmlformats-officedocument.wordprocessingml.document",                          color: FOLDER_COLOR },
+  { type: "pptx", label: "Slides",        mimeType: "application/vnd.openxmlformats-officedocument.presentationml.presentation",                        color: FOLDER_COLOR },
+  { type: "xlsx", label: "Spreadsheets",  mimeType: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",                                color: FOLDER_COLOR },
+  { type: "txt",  label: "Text",          mimeType: "text/plain",                                                                                       color: FOLDER_COLOR },
+  { type: "md",   label: "Markdown",      mimeType: "text/markdown",                                                                                    color: FOLDER_COLOR },
+  { type: "html", label: "HTML",          mimeType: "text/html",                                                                                        color: FOLDER_COLOR },
+  { type: "epub", label: "Books",         mimeType: "application/epub+zip",                                                                             color: FOLDER_COLOR },
 ];
 
 function formatSize(bytes: number): string {
