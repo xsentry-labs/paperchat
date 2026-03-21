@@ -32,6 +32,7 @@ export interface GraphNode {
   label: string;
   entityType?: string; // only for entity nodes
   documentId?: string; // only for entity nodes (which doc they appear in)
+  weight?: number;     // chunk frequency — used to scale node radius in the visualizer
 }
 
 export interface GraphEdge {
@@ -186,10 +187,11 @@ export async function buildGraphForUser(userId: string): Promise<{
     .select("chunk_id, entities(id, name, type)")
     .in("chunk_id", chunkIds);
 
-  // Build entity nodes and aggregate doc→entity edges
-  const entityNodes = new Map<string, GraphNode>();
-  const edgeSet = new Set<string>(); // "docId:entityId"
-  const edges: GraphEdge[] = [];
+  // Count how many chunks reference each entity, and track doc→entity edges
+  const entityMeta = new Map<
+    string,
+    { node: GraphNode; chunkCount: number; docIds: Set<string> }
+  >();
 
   for (const row of ceRows ?? []) {
     const eRaw = row.entities as unknown;
@@ -198,28 +200,49 @@ export async function buildGraphForUser(userId: string): Promise<{
       : (eRaw as { id: string; name: string; type: string } | null);
     if (!e) continue;
 
-    if (!entityNodes.has(e.id)) {
-      entityNodes.set(e.id, {
-        id: e.id,
-        type: "entity",
-        label: e.name,
-        entityType: e.type,
+    if (!entityMeta.has(e.id)) {
+      entityMeta.set(e.id, {
+        node: { id: e.id, type: "entity", label: e.name, entityType: e.type },
+        chunkCount: 0,
+        docIds: new Set(),
       });
     }
+    const meta = entityMeta.get(e.id)!;
+    meta.chunkCount += 1;
 
     const docId = chunkToDoc.get(row.chunk_id);
-    if (docId) {
-      const key = `${docId}:${e.id}`;
+    if (docId) meta.docIds.add(docId);
+  }
+
+  // Keep only significant entities:
+  // — appear in ≥2 chunks (avoids one-time noise)
+  // — OR if a doc has very few chunks, keep top-referenced ones
+  // — then cap at 50 by chunk frequency so the graph stays readable
+  const minChunks = chunks.length <= 5 ? 1 : 2;
+  const significant = Array.from(entityMeta.values())
+    .filter((m) => m.chunkCount >= minChunks)
+    .sort((a, b) => b.chunkCount - a.chunkCount)
+    .slice(0, 50);
+
+  const edges: GraphEdge[] = [];
+  const edgeSet = new Set<string>();
+
+  for (const { node, docIds } of significant) {
+    for (const docId of docIds) {
+      const key = `${docId}:${node.id}`;
       if (!edgeSet.has(key)) {
         edgeSet.add(key);
-        edges.push({ source: docId, target: e.id, type: "mentions" });
+        edges.push({ source: docId, target: node.id, type: "mentions" });
       }
     }
   }
 
   const nodes: GraphNode[] = [
     ...docs.map((d) => ({ id: d.id, type: "document" as const, label: d.filename })),
-    ...Array.from(entityNodes.values()),
+    ...significant.map((m) => ({
+      ...m.node,
+      weight: m.chunkCount, // used by frontend to scale node size
+    })),
   ];
 
   return { nodes, edges };

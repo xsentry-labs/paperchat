@@ -20,6 +20,7 @@ interface GraphNode {
   type: "document" | "entity";
   label: string;
   entityType?: string;
+  weight?: number; // chunk frequency — drives node radius
   x?: number;
   y?: number;
   vx?: number;
@@ -63,7 +64,10 @@ function nodeColor(node: GraphNode): string {
 }
 
 function nodeRadius(node: GraphNode): number {
-  return node.type === "document" ? 10 : 5;
+  if (node.type === "document") return 10;
+  // Entity radius: 3–8 px based on how many chunks reference it
+  const w = node.weight ?? 1;
+  return Math.max(3, Math.min(8, 3 + Math.sqrt(w) * 1.2));
 }
 
 // ── Physics ─────────────────────────────────────────────────────────────────
@@ -384,14 +388,24 @@ export function KnowledgeGraph() {
           ctx.stroke();
         }
 
-        // Labels
-        const showLabel = n.type === "document" || isHovered || isSelected || (q && n.label.includes(q));
+        // Labels: always show for documents; show for high-weight entities or on hover/select/search
+        const isProminent = (n.weight ?? 1) >= 4;
+        const showLabel =
+          n.type === "document" ||
+          isHovered ||
+          isSelected ||
+          (q && n.label.includes(q)) ||
+          isProminent;
         if (showLabel) {
-          const label = n.label.length > 22 ? n.label.slice(0, 20) + "…" : n.label;
-          ctx.font = n.type === "document" ? "bold 10px sans-serif" : "9px sans-serif";
-          ctx.fillStyle = isDim ? "rgba(148,163,184,0.25)" : "rgba(226,232,240,0.8)";
+          const label = n.label.length > 24 ? n.label.slice(0, 22) + "…" : n.label;
+          ctx.font = n.type === "document" ? "bold 11px sans-serif" : "9px sans-serif";
+          ctx.fillStyle = isDim
+            ? "rgba(148,163,184,0.2)"
+            : n.type === "document"
+            ? "rgba(226,232,240,0.9)"
+            : "rgba(200,200,220,0.65)";
           ctx.textAlign = "center";
-          ctx.fillText(label, n.x ?? 0, (n.y ?? 0) + r + 11);
+          ctx.fillText(label, n.x ?? 0, (n.y ?? 0) + r + 12);
         }
       }
 
@@ -589,19 +603,18 @@ export function KnowledgeGraph() {
         onWheel={handleWheel}
       />
 
-      {/* Top-left: stats + search */}
-      <div className="absolute top-3 left-3 flex flex-col gap-2">
-        <div className="flex items-center gap-2">
-          <span className="text-[10px] text-slate-500">{stats.nodes} nodes</span>
-          <span className="text-[10px] text-slate-500">{stats.edges} edges</span>
-        </div>
+      {/* Top-left: search */}
+      <div className="absolute top-3 left-3 flex flex-col gap-1.5">
         <input
           type="text"
-          placeholder="Search entities…"
+          placeholder="Search…"
           value={search}
           onChange={(e) => setSearch(e.target.value)}
-          className="w-36 rounded-md border border-white/10 bg-black/40 px-2 py-1 text-[10px] text-slate-300 placeholder:text-slate-600 focus:outline-none focus:border-white/20 backdrop-blur-sm"
+          className="w-32 rounded-md border border-white/10 bg-black/50 px-2 py-1 text-[10px] text-slate-300 placeholder:text-slate-600 focus:outline-none focus:border-white/25 backdrop-blur-sm"
         />
+        <span className="text-[9px] text-slate-700">
+          {stats.nodes} nodes · {stats.edges} links
+        </span>
       </div>
 
       {/* Bottom-left: entity type filters */}
