@@ -77,9 +77,7 @@ function ShellInner({ email, isAnonymous, children }: AppShellProps) {
       >
         {/* Header */}
         <div className={`flex h-12 items-center shrink-0 ${collapsed ? "justify-center px-2" : "justify-between px-4"}`}>
-          {collapsed ? (
-            <span className="text-sm font-semibold text-foreground">p</span>
-          ) : (
+          {!collapsed && (
             <span className="text-sm font-semibold tracking-tight text-foreground">paperchat</span>
           )}
           <CollapseToggle />
