@@ -80,6 +80,6 @@ export function isEncrypted(text: string): boolean {
   return (
     /^[0-9a-f]{32}$/.test(parts[0]) && // IV: 16 bytes = 32 hex chars
     /^[0-9a-f]{32}$/.test(parts[1]) && // Tag: 16 bytes = 32 hex chars
-    /^[0-9a-f]+$/.test(parts[2]) // Ciphertext: any length hex
+    /^[0-9a-f]*$/.test(parts[2]) // Ciphertext: hex (empty string encrypts to empty)
   );
 }
