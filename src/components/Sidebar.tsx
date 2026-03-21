@@ -24,6 +24,11 @@ export function Sidebar() {
 
   useEffect(() => { fetchConversations(); }, [fetchConversations]);
 
+  useEffect(() => {
+    window.addEventListener("conversation-updated", fetchConversations);
+    return () => window.removeEventListener("conversation-updated", fetchConversations);
+  }, [fetchConversations]);
+
   async function handleNewChat() {
     const res = await fetch("/api/conversations", {
       method: "POST",

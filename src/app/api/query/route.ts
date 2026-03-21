@@ -69,7 +69,7 @@ export async function POST(request: Request) {
   // Get conversation
   const { data: conversation, error: convError } = await supabase
     .from("conversations")
-    .select("document_id")
+    .select("document_id, title")
     .eq("id", conversationId)
     .single();
 
@@ -191,10 +191,21 @@ export async function POST(request: Request) {
         sources,
       });
 
-      // Update conversation timestamp
+      // Auto-title the conversation from the first question
+      const isUntitled =
+        conversation.title === "New chat" || conversation.title === "New conversation";
+      const newTitle = isUntitled
+        ? question.length > 60
+          ? question.slice(0, 58).trimEnd() + "…"
+          : question
+        : null;
+
       await admin
         .from("conversations")
-        .update({ updated_at: new Date().toISOString() })
+        .update({
+          updated_at: new Date().toISOString(),
+          ...(newTitle ? { title: newTitle } : {}),
+        })
         .eq("id", conversationId);
 
       // Write agent activity log (fire-and-forget)
