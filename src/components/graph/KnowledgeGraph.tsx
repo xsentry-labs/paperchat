@@ -182,6 +182,9 @@ export function KnowledgeGraph() {
   const transformRef = useRef({ x: 0, y: 0, scale: 1 });
   const isPanningRef = useRef(false);
   const panStartRef = useRef({ mx: 0, my: 0, tx: 0, ty: 0 });
+  const draggingNodeRef = useRef<GraphNode | null>(null);
+  const isDraggingNodeRef = useRef(false);
+  const dragStartRef = useRef({ mx: 0, my: 0, nx: 0, ny: 0 });
 
   const { theme } = useTheme();
 
@@ -273,8 +276,9 @@ export function KnowledgeGraph() {
       b.vy = (b.vy ?? 0) - dy * strength;
     }
 
-    // Damping + center pull
+    // Damping + center pull (skip dragged node)
     for (const n of nodes) {
+      if (n.id === draggingNodeRef.current?.id) { n.vx = 0; n.vy = 0; continue; }
       n.vx = (n.vx ?? 0) * DAMPING + (cx - (n.x ?? cx)) * CENTER_PULL;
       n.vy = (n.vy ?? 0) * DAMPING + (cy - (n.y ?? cy)) * CENTER_PULL;
       n.x = (n.x ?? cx) + (n.vx ?? 0);
@@ -410,6 +414,25 @@ export function KnowledgeGraph() {
     const mx = e.clientX - rect.left;
     const my = e.clientY - rect.top;
 
+    // Node dragging
+    if (draggingNodeRef.current) {
+      const dx = mx - dragStartRef.current.mx;
+      const dy = my - dragStartRef.current.my;
+      if (!isDraggingNodeRef.current && dx * dx + dy * dy > 16) {
+        isDraggingNodeRef.current = true;
+      }
+      if (isDraggingNodeRef.current) {
+        const { scale } = transformRef.current;
+        draggingNodeRef.current.x = dragStartRef.current.nx + dx / scale;
+        draggingNodeRef.current.y = dragStartRef.current.ny + dy / scale;
+        draggingNodeRef.current.vx = 0;
+        draggingNodeRef.current.vy = 0;
+        canvasRef.current!.style.cursor = "grabbing";
+      }
+      hoveredRef.current = draggingNodeRef.current.id;
+      return;
+    }
+
     if (isPanningRef.current) {
       transformRef.current.x = panStartRef.current.tx + (mx - panStartRef.current.mx);
       transformRef.current.y = panStartRef.current.ty + (my - panStartRef.current.my);
@@ -427,7 +450,12 @@ export function KnowledgeGraph() {
     const mx = e.clientX - rect.left;
     const my = e.clientY - rect.top;
 
-    if (!getNodeAt(mx, my)) {
+    const node = getNodeAt(mx, my);
+    if (node) {
+      draggingNodeRef.current = node;
+      isDraggingNodeRef.current = false;
+      dragStartRef.current = { mx, my, nx: node.x ?? 0, ny: node.y ?? 0 };
+    } else {
       isPanningRef.current = true;
       panStartRef.current = { mx, my, tx: transformRef.current.x, ty: transformRef.current.y };
       canvasRef.current!.style.cursor = "grabbing";
@@ -439,6 +467,21 @@ export function KnowledgeGraph() {
     if (!rect) return;
     const mx = e.clientX - rect.left;
     const my = e.clientY - rect.top;
+
+    if (draggingNodeRef.current) {
+      const wasDragging = isDraggingNodeRef.current;
+      const node = draggingNodeRef.current;
+      draggingNodeRef.current = null;
+      isDraggingNodeRef.current = false;
+      if (!wasDragging) {
+        // It was a click — toggle selection
+        const next = node.id === selectedRef.current ? null : node.id;
+        selectedRef.current = next;
+        setSelectedNode(next ? node : null);
+      }
+      canvasRef.current!.style.cursor = "grab";
+      return;
+    }
 
     if (isPanningRef.current) {
       isPanningRef.current = false;
@@ -509,7 +552,7 @@ export function KnowledgeGraph() {
           onMouseMove={handleMouseMove}
           onMouseDown={handleMouseDown}
           onMouseUp={handleMouseUp}
-          onMouseLeave={() => { hoveredRef.current = null; isPanningRef.current = false; }}
+          onMouseLeave={() => { hoveredRef.current = null; isPanningRef.current = false; draggingNodeRef.current = null; isDraggingNodeRef.current = false; }}
           onWheel={handleWheel}
         />
         <div className="absolute bottom-3 left-0 right-0 flex justify-center pointer-events-none">
@@ -538,7 +581,7 @@ export function KnowledgeGraph() {
         onMouseMove={handleMouseMove}
         onMouseDown={handleMouseDown}
         onMouseUp={handleMouseUp}
-        onMouseLeave={() => { hoveredRef.current = null; isPanningRef.current = false; }}
+        onMouseLeave={() => { hoveredRef.current = null; isPanningRef.current = false; draggingNodeRef.current = null; isDraggingNodeRef.current = false; }}
         onWheel={handleWheel}
       />
 
@@ -563,7 +606,7 @@ export function KnowledgeGraph() {
       {/* Hints */}
       <div className="absolute bottom-3 right-3 flex flex-col items-end gap-0.5 pointer-events-none">
         <p className="text-[9px] text-muted-foreground/30">scroll to zoom · drag to pan</p>
-        <p className="text-[9px] text-muted-foreground/30">click document for links</p>
+        <p className="text-[9px] text-muted-foreground/30">click to select · drag node to move</p>
       </div>
 
       {/* Detail panel */}
