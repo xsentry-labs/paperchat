@@ -7,6 +7,7 @@ import { ALL_MODELS, DEFAULT_MODEL_ID, PROVIDER_LABELS, COST_TIER_LABELS } from 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
+import { authFetch } from "@/lib/auth-fetch";
 
 export default function SettingsPage() {
   const router = useRouter();
@@ -36,7 +37,7 @@ export default function SettingsPage() {
         setIsAnonymous((user as { is_anonymous?: boolean }).is_anonymous ?? false);
       }
 
-      const profileRes = await fetch("/api/profile");
+      const profileRes = await authFetch("/api/profile");
       if (profileRes.ok) {
         const { profile } = await profileRes.json();
         if (profile?.preferred_model) {
@@ -44,7 +45,7 @@ export default function SettingsPage() {
         }
       }
 
-      const docsRes = await fetch("/api/documents");
+      const docsRes = await authFetch("/api/documents");
       if (docsRes.ok) {
         const { documents } = await docsRes.json();
         setDocCount(documents.length);
@@ -57,7 +58,7 @@ export default function SettingsPage() {
   async function handleSaveModel() {
     setSaving(true);
     setMessage(null);
-    const res = await fetch("/api/profile", {
+    const res = await authFetch("/api/profile", {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ preferred_model: preferredModel }),
@@ -69,12 +70,12 @@ export default function SettingsPage() {
   async function handleDeleteAll() {
     setDeleting(true);
     setShowDeleteConfirm(false);
-    const docsRes = await fetch("/api/documents");
+    const docsRes = await authFetch("/api/documents");
     if (docsRes.ok) {
       const { documents } = await docsRes.json();
       await Promise.all(
         documents.map((doc: { id: string }) =>
-          fetch(`/api/documents?id=${encodeURIComponent(doc.id)}`, { method: "DELETE" })
+          authFetch(`/api/documents?id=${encodeURIComponent(doc.id)}`, { method: "DELETE" })
         )
       );
     }

@@ -6,6 +6,7 @@ import type { Conversation } from "@/lib/types";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { useSidebar } from "./SidebarProvider";
 import { Skeleton } from "@/components/ui/skeleton";
+import { authFetch } from "@/lib/auth-fetch";
 
 interface ConversationWithDoc extends Conversation {
   documents?: { filename: string };
@@ -20,7 +21,7 @@ export function Sidebar() {
   const { collapsed } = useSidebar();
 
   const fetchConversations = useCallback(async () => {
-    const res = await fetch("/api/conversations");
+    const res = await authFetch("/api/conversations");
     if (res.ok) setConversations((await res.json()).conversations);
     setLoading(false);
   }, []);
@@ -33,7 +34,7 @@ export function Sidebar() {
   }, [fetchConversations]);
 
   async function handleNewChat() {
-    const res = await fetch("/api/conversations", {
+    const res = await authFetch("/api/conversations", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ title: "New chat" }),
@@ -49,7 +50,7 @@ export function Sidebar() {
     if (!confirmDelete) return;
     const { id } = confirmDelete;
     setConfirmDelete(null);
-    const res = await fetch(`/api/conversations?id=${encodeURIComponent(id)}`, { method: "DELETE" });
+    const res = await authFetch(`/api/conversations?id=${encodeURIComponent(id)}`, { method: "DELETE" });
     if (res.ok) {
       setConversations((p) => p.filter((c) => c.id !== id));
       if (pathname === `/chat/${id}`) router.push("/");

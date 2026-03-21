@@ -8,6 +8,7 @@ import { StatusDot } from "@/components/file-explorer/StatusDot";
 import { UploadButton } from "@/components/file-explorer/UploadButton";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { Skeleton } from "@/components/ui/skeleton";
+import { authFetch } from "@/lib/auth-fetch";
 
 // Dynamic import: KnowledgeGraph uses canvas APIs - must be client-only
 const KnowledgeGraph = dynamic(
@@ -71,7 +72,7 @@ export default function ArtifactsPage() {
   const pollingRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   const fetchDocuments = useCallback(async () => {
-    const res = await fetch("/api/documents");
+    const res = await authFetch("/api/documents");
     if (res.ok) setDocuments((await res.json()).documents);
     setDocsLoading(false);
   }, []);
@@ -97,7 +98,7 @@ export default function ArtifactsPage() {
       const results = await Promise.all(
         files.map(async (file) => {
           const formData = new FormData(); formData.append("file", file);
-          const res = await fetch("/api/upload", { method: "POST", body: formData });
+          const res = await authFetch("/api/upload", { method: "POST", body: formData });
           if (!res.ok) { const d = await res.json(); return d.error ?? `Failed to upload "${file.name}"`; }
           return null;
         })
@@ -112,7 +113,7 @@ export default function ArtifactsPage() {
     if (!confirmDelete) return;
     const { id } = confirmDelete;
     setConfirmDelete(null);
-    const res = await fetch(`/api/documents?id=${encodeURIComponent(id)}`, { method: "DELETE" });
+    const res = await authFetch(`/api/documents?id=${encodeURIComponent(id)}`, { method: "DELETE" });
     if (res.ok) {
       setDocuments((p) => p.filter((d) => d.id !== id));
     }

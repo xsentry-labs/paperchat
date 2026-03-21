@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { useRouter, usePathname } from "next/navigation";
 import type { Conversation } from "@/lib/types";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
+import { authFetch } from "@/lib/auth-fetch";
 
 interface ConversationWithDoc extends Conversation {
   documents?: { filename: string };
@@ -20,7 +21,7 @@ export function ConversationList() {
   }, []);
 
   async function fetchConversations() {
-    const res = await fetch("/api/conversations");
+    const res = await authFetch("/api/conversations");
     if (res.ok) {
       const data = await res.json();
       setConversations(data.conversations);
@@ -32,7 +33,7 @@ export function ConversationList() {
     const id = confirmDeleteId;
     setConfirmDeleteId(null);
 
-    const res = await fetch(`/api/conversations?id=${encodeURIComponent(id)}`, {
+    const res = await authFetch(`/api/conversations?id=${encodeURIComponent(id)}`, {
       method: "DELETE",
     });
     if (res.ok) {
