@@ -1,4 +1,4 @@
-import { streamText } from "ai";
+import { streamText, createUIMessageStream, createUIMessageStreamResponse } from "ai";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { retrieveChunksHybrid, type RetrievedChunk } from "@/lib/retrieval";
@@ -143,24 +143,31 @@ export async function POST(request: Request) {
     content: question,
   });
 
-  // Stream LLM response
+  // Stream LLM response and pipe sources as message-metadata
   const provider = createLLMProvider();
   const model = provider(modelId);
-
   const tGen = Date.now();
 
-  const result = streamText({
-    model,
-    system: SYSTEM_PROMPT,
-    messages: [
-      {
-        role: "user",
-        content: hasContext
-          ? `Context:\n${contextBlocks}\n\nQuestion: ${question}`
-          : question,
-      },
-    ],
-    async onFinish({ text }) {
+  const uiStream = createUIMessageStream({
+    execute: async ({ writer }) => {
+      const result = streamText({
+        model,
+        system: SYSTEM_PROMPT,
+        messages: [
+          {
+            role: "user",
+            content: hasContext
+              ? `Context:\n${contextBlocks}\n\nQuestion: ${question}`
+              : question,
+          },
+        ],
+      });
+
+      // Pipe text to client immediately
+      writer.merge(result.toUIMessageStream());
+
+      // Wait for full text (resolves when generation finishes)
+      const text = await result.text;
       const genMs = Date.now() - tGen;
       steps.push({ step: "generation", duration_ms: genMs });
 
@@ -183,7 +190,15 @@ export async function POST(request: Request) {
           };
         });
 
-      // Save assistant message with citations
+      // Send sources to client via stream (arrives immediately, no DB round-trip)
+      if (sources.length > 0) {
+        writer.write({
+          type: "message-metadata",
+          messageMetadata: { sources },
+        } as Parameters<typeof writer.write>[0]);
+      }
+
+      // Save assistant message with citations to DB
       await admin.from("chat_messages").insert({
         conversation_id: conversationId,
         role: "assistant",
@@ -196,7 +211,7 @@ export async function POST(request: Request) {
         conversation.title === "New chat" || conversation.title === "New conversation";
       const newTitle = isUntitled
         ? question.length > 60
-          ? question.slice(0, 58).trimEnd() + "…"
+          ? question.slice(0, 58).trimEnd() + "..."
           : question
         : null;
 
@@ -222,5 +237,5 @@ export async function POST(request: Request) {
     },
   });
 
-  return result.toUIMessageStreamResponse();
+  return createUIMessageStreamResponse({ stream: uiStream });
 }
