@@ -42,12 +42,13 @@ export async function updateSession(request: NextRequest) {
   const isApiRoute = request.nextUrl.pathname.startsWith("/api/");
 
   // Unauthenticated users can only access auth routes.
-  // Explicitly use 307 (Temporary Redirect) so the browser does NOT cache
-  // this redirect — the auth state is transient and will change after login.
+  // Use 307 (Temporary) + no-store so the browser NEVER caches auth redirects.
   if (!user && !isAuthRoute && !isApiRoute && !request.nextUrl.pathname.startsWith("/auth")) {
     const url = request.nextUrl.clone();
     url.pathname = "/login";
-    return NextResponse.redirect(url, 307);
+    const res = NextResponse.redirect(url, 307);
+    res.headers.set("Cache-Control", "no-store, no-cache, must-revalidate");
+    return res;
   }
 
   // Authenticated non-anonymous users shouldn't see auth pages
@@ -56,7 +57,9 @@ export async function updateSession(request: NextRequest) {
   if (user && !isAnonymous && isAuthRoute && !isResetPassword) {
     const url = request.nextUrl.clone();
     url.pathname = "/";
-    return NextResponse.redirect(url, 307);
+    const res = NextResponse.redirect(url, 307);
+    res.headers.set("Cache-Control", "no-store, no-cache, must-revalidate");
+    return res;
   }
 
   return supabaseResponse;
