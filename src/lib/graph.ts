@@ -26,6 +26,7 @@ export interface GraphNode {
   id: string;
   type: "document";
   label: string;
+  summary?: string | null;
   degree?: number; // number of other documents this doc links to
 }
 
@@ -149,7 +150,7 @@ export async function buildGraphForUser(userId: string): Promise<{
   // 1. Fetch all ready documents
   const { data: docs } = await admin
     .from("documents")
-    .select("id, filename")
+    .select("id, filename, summary")
     .eq("user_id", userId)
     .eq("status", "ready");
 
@@ -230,6 +231,7 @@ export async function buildGraphForUser(userId: string): Promise<{
     id: d.id,
     type: "document",
     label: d.filename,
+    summary: d.summary ?? null,
     degree: degreeMap.get(d.id) ?? 0,
   }));
 

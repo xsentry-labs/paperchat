@@ -15,6 +15,7 @@ import { useEffect, useRef, useState, useCallback } from "react";
 interface GraphNode {
   id: string;
   label: string;
+  summary?: string | null;
   degree: number;
   x?: number;
   y?: number;
@@ -94,6 +95,13 @@ function DetailPanel({
         </button>
       </div>
 
+      {node.summary && (
+        <div className="mb-3">
+          <p className="text-[9px] uppercase tracking-widest text-slate-600 mb-1">Summary</p>
+          <p className="text-[10px] text-slate-400 leading-relaxed line-clamp-4">{node.summary}</p>
+        </div>
+      )}
+
       {links.length === 0 ? (
         <p className="text-[10px] text-slate-600">No links yet — upload more documents.</p>
       ) : (
@@ -101,7 +109,7 @@ function DetailPanel({
           <p className="text-[9px] uppercase tracking-widest text-slate-600 mb-2">
             Linked to {links.length} document{links.length !== 1 ? "s" : ""}
           </p>
-          <div className="space-y-2 max-h-48 overflow-y-auto pr-0.5">
+          <div className="space-y-2 max-h-40 overflow-y-auto pr-0.5">
             {links.map(({ peer, weight, shared }) => (
               <div key={peer.id} className="rounded-lg bg-white/[0.03] border border-white/5 p-2">
                 <div className="flex items-center justify-between mb-1">
