@@ -37,7 +37,7 @@ export async function checkRateLimit(userId: string): Promise<RateLimitResult> {
     );
 
   if (error) {
-    // Fail closed — block queries if we can't verify the rate limit
+    // Fail closed - block queries if we can't verify the rate limit
     console.error("Rate limit check failed:", error.message);
     return { allowed: false, remaining: 0, limit: DAILY_QUERY_LIMIT, resetsAt: endOfDay.toISOString() };
   }

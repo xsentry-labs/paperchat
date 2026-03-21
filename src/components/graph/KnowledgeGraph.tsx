@@ -1,7 +1,7 @@
 "use client";
 
 /**
- * KnowledgeGraph — Obsidian-style document relationship graph.
+ * KnowledgeGraph - Obsidian-style document relationship graph.
  *
  * Nodes  = Documents (sized by connection count)
  * Edges  = Two documents share entities (thickness = shared entity count)
@@ -130,7 +130,7 @@ function DetailPanel({
       )}
 
       {links.length === 0 ? (
-        <p className="text-[10px] text-muted-foreground/50">No links yet — upload more documents.</p>
+        <p className="text-[10px] text-muted-foreground/50">No links yet - upload more documents.</p>
       ) : (
         <>
           <p className="text-[9px] uppercase tracking-widest text-muted-foreground/50 mb-2">

@@ -122,7 +122,7 @@ export default function SettingsPage() {
         </div>
       )}
 
-      {/* Create account — only for guests */}
+      {/* Create account - only for guests */}
       {isAnonymous && (
         <section className="space-y-3">
           <h2 className="text-sm font-medium text-muted-foreground uppercase tracking-wider">Create Account</h2>
@@ -169,7 +169,7 @@ export default function SettingsPage() {
         </section>
       )}
 
-      {/* Account — only for registered users */}
+      {/* Account - only for registered users */}
       {!isAnonymous && (
         <section className="space-y-3">
           <h2 className="text-sm font-medium text-muted-foreground uppercase tracking-wider">Account</h2>

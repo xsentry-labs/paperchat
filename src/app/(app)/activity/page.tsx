@@ -1,7 +1,7 @@
 "use client";
 
 /**
- * /activity — Agent execution trace log.
+ * /activity - Agent execution trace log.
  *
  * Shows every query the agent processed: what it retrieved, which entities
  * it used, timing per pipeline step, and the final output.
@@ -372,7 +372,7 @@ export default function ActivityPage() {
               />
             </svg>
             <p className="text-xs text-muted-foreground/40">
-              No activity yet — ask a question to see traces here.
+              No activity yet - ask a question to see traces here.
             </p>
           </div>
         ) : (

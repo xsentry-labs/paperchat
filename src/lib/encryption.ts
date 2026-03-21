@@ -1,5 +1,5 @@
 /**
- * Encryption at rest — AES-256-GCM
+ * Encryption at rest - AES-256-GCM
  *
  * Strategy:
  *   - Master secret lives in ENCRYPTION_SECRET env var
@@ -10,7 +10,7 @@
  *
  * What is encrypted: chunk content (text stored in DB)
  * What is NOT encrypted: embeddings (vectors), metadata, filenames
- *   — embeddings reveal little about content and are needed raw for pgvector
+ *   - embeddings reveal little about content and are needed raw for pgvector
  */
 
 import {
@@ -26,7 +26,7 @@ const TAG_LENGTH = 16; // bytes (GCM auth tag)
 
 /**
  * Derive a stable 32-byte encryption key for a given user.
- * Uses SHA-256(userId + masterSecret) — no key storage needed.
+ * Uses SHA-256(userId + masterSecret) - no key storage needed.
  */
 export function deriveUserKey(userId: string): Buffer {
   const master =

@@ -1,5 +1,5 @@
 /**
- * OCR module — Tesseract.js + pdfjs-dist + @napi-rs/canvas
+ * OCR module - Tesseract.js + pdfjs-dist + @napi-rs/canvas
  *
  * Used when a PDF appears to be scanned (image-based) rather than
  * digitally typeset. Detection is based on text density per page.
@@ -20,7 +20,7 @@
 /** Minimum average non-whitespace chars per page before we try OCR */
 const SCANNED_THRESHOLD = 80;
 
-/** Maximum pages to OCR — beyond this the user should use a native PDF */
+/** Maximum pages to OCR - beyond this the user should use a native PDF */
 export const OCR_MAX_PAGES = 20;
 
 /**
@@ -47,7 +47,7 @@ async function renderPageToBuffer(
   const pdfjsLib = await import("pdfjs-dist");
   const { createCanvas } = await import("@napi-rs/canvas");
 
-  // Disable the web worker — we're in Node.js
+  // Disable the web worker - we're in Node.js
   pdfjsLib.GlobalWorkerOptions.workerSrc = "";
 
   const pdfDoc = await pdfjsLib.getDocument({

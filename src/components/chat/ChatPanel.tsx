@@ -239,7 +239,7 @@ export function ChatPanel({ conversationId, initialQuestion }: ChatPanelProps) {
                   </div>
                 ) : (
                   <div className="space-y-3">
-                    {/* Assistant message — no bubble, just content */}
+                    {/* Assistant message - no bubble, just content */}
                     <div className="max-w-full overflow-hidden">
                       <MarkdownContent content={content} />
                     </div>

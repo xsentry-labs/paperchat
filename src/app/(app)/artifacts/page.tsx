@@ -8,7 +8,7 @@ import { StatusDot } from "@/components/file-explorer/StatusDot";
 import { UploadButton } from "@/components/file-explorer/UploadButton";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 
-// Dynamic import: KnowledgeGraph uses canvas APIs — must be client-only
+// Dynamic import: KnowledgeGraph uses canvas APIs - must be client-only
 const KnowledgeGraph = dynamic(
   () => import("@/components/graph/KnowledgeGraph").then((m) => ({ default: m.KnowledgeGraph })),
   { ssr: false, loading: () => <div className="flex h-full items-center justify-center"><p className="text-xs text-muted-foreground/40 animate-pulse">Loading graph…</p></div> }
@@ -273,10 +273,10 @@ export default function ArtifactsPage() {
                 <div className="w-44">
                   <UploadButton onFileSelect={handleUpload} loading={uploading} />
                 </div>
-                <p className="text-[10px] text-muted-foreground/30">PDF · DOCX · PPTX · XLSX · TXT · MD · HTML · EPUB — up to 50MB</p>
+                <p className="text-[10px] text-muted-foreground/30">PDF · DOCX · PPTX · XLSX · TXT · MD · HTML · EPUB - up to 50MB</p>
               </div>
 
-              {/* Folders — always shown */}
+              {/* Folders - always shown */}
               <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
                 {foldersWithCounts.map((folder) => (
                   <button

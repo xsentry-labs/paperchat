@@ -1,7 +1,7 @@
 /**
  * LLM provider abstraction.
  *
- * Supports two backends — configured via environment variables:
+ * Supports two backends - configured via environment variables:
  *   OPENROUTER_API_KEY  → routes through OpenRouter (all models in models.ts)
  *   OPENAI_API_KEY      → direct OpenAI API (OpenAI models only)
  *
@@ -18,7 +18,7 @@ import { createOpenAI } from "@ai-sdk/openai";
 // New code should import from models.ts directly.
 export { DEFAULT_MODEL_ID } from "@/lib/models";
 
-// Legacy ModelKey type — kept for compatibility with profile/model selector
+// Legacy ModelKey type - kept for compatibility with profile/model selector
 export type ModelKey = string;
 
 /**
@@ -45,6 +45,6 @@ export function createLLMProvider() {
 
 export const SYSTEM_PROMPT = `You are a helpful, general-purpose assistant. You can answer questions on any topic using your own knowledge.
 
-When document context blocks are provided below, use them to give grounded answers and cite sources inline as [1], [2], etc. matching the context block numbers. Prefer document context over your own knowledge when it is relevant. Do not mention having "access" to documents or describe which blocks you have — just answer naturally.
+When document context blocks are provided below, use them to give grounded answers and cite sources inline as [1], [2], etc. matching the context block numbers. Prefer document context over your own knowledge when it is relevant. Do not mention having "access" to documents or describe which blocks you have - just answer naturally.
 
 If no document context is provided, or the context is not relevant to the question, answer freely using your general knowledge. Be direct and concise.`;

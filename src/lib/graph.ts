@@ -1,11 +1,11 @@
 /**
- * Knowledge graph operations — stored relationally in PostgreSQL.
+ * Knowledge graph operations - stored relationally in PostgreSQL.
  *
  * Visualization model (Obsidian-style):
  *   Nodes  = Documents
  *   Edges  = Two documents share ≥1 entity (weighted by shared entity count)
  *
- * Entity extraction still happens per-chunk during ingestion — entities are the
+ * Entity extraction still happens per-chunk during ingestion - entities are the
  * mechanism for finding document relationships, but they don't appear as nodes
  * in the frontend graph.
  */

@@ -316,7 +316,7 @@ function extractOverlapFromEnd(text: string, maxChars: number): string {
 function cleanText(text: string): string {
   return text
     // Normalize various dash/hyphen characters
-    .replace(/[\u2013\u2014]/g, "—")
+    .replace(/[\u2013\u2014]/g, "-")
     // Normalize quotes
     .replace(/[\u201C\u201D]/g, '"')
     .replace(/[\u2018\u2019]/g, "'")

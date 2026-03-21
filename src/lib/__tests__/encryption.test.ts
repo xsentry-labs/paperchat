@@ -18,7 +18,7 @@ describe("deriveUserKey", () => {
     expect(key.length).toBe(32);
   });
 
-  it("is deterministic — same userId returns same key", () => {
+  it("is deterministic - same userId returns same key", () => {
     const k1 = deriveUserKey("user-abc");
     const k2 = deriveUserKey("user-abc");
     expect(k1.toString("hex")).toBe(k2.toString("hex"));
@@ -89,7 +89,7 @@ describe("isEncrypted", () => {
   });
 });
 
-describe("backward compat — decrypt returns plaintext unchanged", () => {
+describe("backward compat - decrypt returns plaintext unchanged", () => {
   it("passes through non-encrypted content", () => {
     const key = deriveUserKey("user-test");
     const plain = "This chunk was stored before encryption was added.";

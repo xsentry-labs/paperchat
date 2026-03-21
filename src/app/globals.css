@@ -22,7 +22,7 @@
   --hover: rgba(255, 255, 255, 0.05);
 }
 
-/* ── Light mode — warm linen ──────────────────────────────────────────────── */
+/* ── Light mode - warm linen ──────────────────────────────────────────────── */
 /*    Inspired by Linear, Craft, and Notion. Warm off-white, not sterile.    */
 html.light {
   --background: #f8f7f4;
