@@ -7,6 +7,7 @@ import { ACCEPTED_FILE_TYPES, POLLING_INTERVAL, MAX_FILE_SIZE } from "@/lib/cons
 import { StatusDot } from "@/components/file-explorer/StatusDot";
 import { UploadButton } from "@/components/file-explorer/UploadButton";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
+import { Skeleton } from "@/components/ui/skeleton";
 
 // Dynamic import: KnowledgeGraph uses canvas APIs - must be client-only
 const KnowledgeGraph = dynamic(
@@ -58,6 +59,7 @@ function FolderIcon({ color }: { color: string }) {
 
 export default function ArtifactsPage() {
   const [documents, setDocuments] = useState<Document[]>([]);
+  const [docsLoading, setDocsLoading] = useState(true);
   const [openFolder, setOpenFolder] = useState<FolderType | null>(null);
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [uploading, setUploading] = useState(false);
@@ -71,6 +73,7 @@ export default function ArtifactsPage() {
   const fetchDocuments = useCallback(async () => {
     const res = await fetch("/api/documents");
     if (res.ok) setDocuments((await res.json()).documents);
+    setDocsLoading(false);
   }, []);
 
   useEffect(() => { fetchDocuments(); }, [fetchDocuments]);
@@ -276,9 +279,15 @@ export default function ArtifactsPage() {
                 <p className="text-[10px] text-muted-foreground/30">PDF · DOCX · PPTX · XLSX · TXT · MD · HTML · EPUB - up to 50MB</p>
               </div>
 
-              {/* Folders - always shown */}
+              {/* Folders */}
               <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
-                {foldersWithCounts.map((folder) => (
+                {docsLoading ? Array.from({ length: 5 }).map((_, i) => (
+                  <div key={i} className="flex flex-col items-center gap-2 rounded-xl p-4">
+                    <Skeleton className="h-12 w-12 rounded-lg" />
+                    <Skeleton className="h-3 w-12" />
+                    <Skeleton className="h-2.5 w-8" />
+                  </div>
+                )) : foldersWithCounts.map((folder) => (
                   <button
                     key={folder.type}
                     onClick={() => setOpenFolder(folder.type)}

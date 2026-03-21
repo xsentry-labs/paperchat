@@ -8,6 +8,7 @@ import { DEFAULT_MODEL_ID } from "@/lib/models";
 import { CitationCard } from "./CitationCard";
 import { MarkdownContent } from "./MarkdownContent";
 import { ModelSelector } from "./ModelSelector";
+import { Skeleton } from "@/components/ui/skeleton";
 
 interface ChatPanelProps {
   conversationId: string;
@@ -97,6 +98,7 @@ function SourcesCollapsible({ citations }: { citations: Citation[] }) {
 
 export function ChatPanel({ conversationId, initialQuestion }: ChatPanelProps) {
   const [history, setHistory] = useState<ChatMessage[]>([]);
+  const [historyLoading, setHistoryLoading] = useState(true);
   const [citations, setCitations] = useState<Record<string, Citation[]>>({});
   const [inputValue, setInputValue] = useState("");
   const [currentModel, setCurrentModel] = useState<string>(DEFAULT_MODEL_ID);
@@ -106,6 +108,7 @@ export function ChatPanel({ conversationId, initialQuestion }: ChatPanelProps) {
   const inputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
+    setHistoryLoading(true);
     async function load() {
       const [msgRes, profileRes, rateLimitRes] = await Promise.all([
         fetch(`/api/conversations/${conversationId}/messages`),
@@ -128,6 +131,7 @@ export function ChatPanel({ conversationId, initialQuestion }: ChatPanelProps) {
       if (rateLimitRes.ok) {
         setRateLimitRemaining((await rateLimitRes.json()).remaining);
       }
+      setHistoryLoading(false);
     }
     load();
   }, [conversationId]);
@@ -208,7 +212,26 @@ export function ChatPanel({ conversationId, initialQuestion }: ChatPanelProps) {
       {/* Messages */}
       <div ref={scrollRef} className="flex-1 overflow-y-auto">
         <div className="mx-auto max-w-2xl px-3 sm:px-4 py-4 sm:py-6 space-y-4 sm:space-y-6">
-          {displayMessages.length === 0 && (
+          {historyLoading ? (
+            <div className="pt-16 sm:pt-24 space-y-6 animate-fade-in">
+              {/* Skeleton: assistant message */}
+              <div className="space-y-2">
+                <Skeleton className="h-3 w-3/4" />
+                <Skeleton className="h-3 w-5/6" />
+                <Skeleton className="h-3 w-2/3" />
+              </div>
+              {/* Skeleton: user message */}
+              <div className="flex justify-end">
+                <Skeleton className="h-8 w-48 rounded-2xl" />
+              </div>
+              {/* Skeleton: assistant message */}
+              <div className="space-y-2">
+                <Skeleton className="h-3 w-5/6" />
+                <Skeleton className="h-3 w-3/4" />
+                <Skeleton className="h-3 w-1/2" />
+              </div>
+            </div>
+          ) : displayMessages.length === 0 ? (
             <div className="flex flex-col items-center justify-center pt-20 sm:pt-32 gap-4 sm:gap-6 px-2">
               <p className="text-sm text-muted-foreground/60 text-center">
                 Ask anything about your documents.
@@ -225,7 +248,7 @@ export function ChatPanel({ conversationId, initialQuestion }: ChatPanelProps) {
                 ))}
               </div>
             </div>
-          )}
+          ) : null}
 
           {displayMessages.map((msg, i) => {
             const content = "content" in msg ? msg.content : "";

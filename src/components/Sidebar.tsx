@@ -5,6 +5,7 @@ import { useRouter, usePathname } from "next/navigation";
 import type { Conversation } from "@/lib/types";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { useSidebar } from "./SidebarProvider";
+import { Skeleton } from "@/components/ui/skeleton";
 
 interface ConversationWithDoc extends Conversation {
   documents?: { filename: string };
@@ -12,6 +13,7 @@ interface ConversationWithDoc extends Conversation {
 
 export function Sidebar() {
   const [conversations, setConversations] = useState<ConversationWithDoc[]>([]);
+  const [loading, setLoading] = useState(true);
   const [confirmDelete, setConfirmDelete] = useState<{ id: string; label: string } | null>(null);
   const router = useRouter();
   const pathname = usePathname();
@@ -20,6 +22,7 @@ export function Sidebar() {
   const fetchConversations = useCallback(async () => {
     const res = await fetch("/api/conversations");
     if (res.ok) setConversations((await res.json()).conversations);
+    setLoading(false);
   }, []);
 
   useEffect(() => { fetchConversations(); }, [fetchConversations]);
@@ -176,7 +179,16 @@ export function Sidebar() {
 
       {/* Conversation list */}
       <div className="flex-1 overflow-y-auto px-2">
-        {conversations.length === 0 ? (
+        {loading ? (
+          <div className="space-y-1 px-1 pt-1">
+            {[72, 52, 88, 60].map((w) => (
+              <div key={w} className="flex items-center gap-2 px-2.5 py-2">
+                <Skeleton className="h-3 w-3 rounded-full shrink-0" />
+                <Skeleton className={`h-3`} style={{ width: `${w}%` }} />
+              </div>
+            ))}
+          </div>
+        ) : conversations.length === 0 ? (
           <p className="px-2 py-12 text-center text-[11px] text-muted-foreground/40">
             No conversations yet
           </p>
