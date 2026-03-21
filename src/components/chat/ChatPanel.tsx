@@ -4,7 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { useChat } from "@ai-sdk/react";
 import { DefaultChatTransport } from "ai";
 import type { ChatMessage } from "@/lib/types";
-import type { ModelKey } from "@/lib/llm";
+import { DEFAULT_MODEL_ID } from "@/lib/models";
 import { CitationCard } from "./CitationCard";
 import { MarkdownContent } from "./MarkdownContent";
 import { ModelSelector } from "./ModelSelector";
@@ -99,7 +99,7 @@ export function ChatPanel({ conversationId, initialQuestion }: ChatPanelProps) {
   const [history, setHistory] = useState<ChatMessage[]>([]);
   const [citations, setCitations] = useState<Record<string, Citation[]>>({});
   const [inputValue, setInputValue] = useState("");
-  const [currentModel, setCurrentModel] = useState<ModelKey>("fast");
+  const [currentModel, setCurrentModel] = useState<string>(DEFAULT_MODEL_ID);
   const [chatError, setChatError] = useState<string | null>(null);
   const [rateLimitRemaining, setRateLimitRemaining] = useState<number | null>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
@@ -123,7 +123,7 @@ export function ChatPanel({ conversationId, initialQuestion }: ChatPanelProps) {
       }
       if (profileRes.ok) {
         const { profile } = await profileRes.json();
-        if (profile?.preferred_model) setCurrentModel(profile.preferred_model as ModelKey);
+        if (profile?.preferred_model) setCurrentModel(profile.preferred_model as string);
       }
       if (rateLimitRes.ok) {
         setRateLimitRemaining((await rateLimitRes.json()).remaining);
@@ -197,7 +197,7 @@ export function ChatPanel({ conversationId, initialQuestion }: ChatPanelProps) {
     await submitMessage(inputValue);
   }
 
-  async function handleModelChange(model: ModelKey) {
+  async function handleModelChange(model: string) {
     setCurrentModel(model);
     fetch("/api/profile", { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ preferred_model: model }) });
   }
