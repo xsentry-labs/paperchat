@@ -104,7 +104,7 @@ export async function POST(request: Request) {
   const retrievalMs = Date.now() - t0;
 
   // Count initial vs expanded
-  const initialCount = Math.min(chunks.length, 6);
+  const initialCount = Math.min(chunks.length, 5);
   const expandedCount = chunks.length - initialCount;
 
   steps.push({

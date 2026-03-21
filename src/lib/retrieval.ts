@@ -20,7 +20,7 @@ export async function retrieveChunks(
   query: string,
   docIds: string[],
   userId: string,
-  k: number = 6
+  k: number = 5
 ): Promise<RetrievedChunk[]> {
   const queryEmbedding = await embedText(query);
   const admin = createAdminClient();
@@ -70,7 +70,7 @@ export async function retrieveChunksHybrid(
   query: string,
   docIds: string[],
   userId: string,
-  k: number = 6
+  k: number = 5
 ): Promise<HybridRetrievalResult> {
   // Step 1: Embedding-based retrieval
   const initialChunks = await retrieveChunks(query, docIds, userId, k);
