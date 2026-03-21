@@ -15,6 +15,8 @@ Built with Next.js 15, Supabase, pgvector, and OpenRouter.
 - **Agent activity log** - every query produces a structured execution trace: retrieved chunks, pipeline step timing, model used. Viewable at `/activity`.
 - **File explorer** - organize documents by type (PDF, Word, Slides, Spreadsheets, Text, Markdown, HTML, Books) with live processing status.
 - **Light and dark mode** - warm linen light mode and dark mode with system-aware flash prevention.
+- **Streaming tool progress** - while the agent works, the chat UI shows which tool is running ("Searching documents…", "Querying data…", etc.) in real time via SSE data events before the answer starts streaming.
+- **Session auto-refresh** - API calls attach the current Supabase access token automatically. On token expiry the client refreshes the session and retries the request transparently, with no visible interruption.
 - **Rate limiting** - 50 queries/day on the free tier.
 - **Skeleton loading** - minimalistic shimmer loading states throughout the UI to prevent empty state flashes.
 
@@ -145,3 +147,5 @@ Deletion is fully cascaded: removing a document removes its chunks, which remove
 - **Async ingestion** - move document processing to a background job so uploads return instantly
 - **Billing** - Stripe integration, pro tier with higher limits
 - **ENTITY -> ENTITY edges** - co-occurrence graph for richer traversal
+- **MCP support** - Model Context Protocol for external tool integration
+- **Scanned PDF support** - cloud OCR (OpenAI Vision / Google Vision) for serverless compatibility
