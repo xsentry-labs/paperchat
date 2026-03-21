@@ -15,8 +15,12 @@ export default async function ChatPage({ params, searchParams }: ChatPageProps) 
     data: { user },
   } = await supabase.auth.getUser();
 
+  // Auth redirect is handled by middleware (307 Temporary Redirect).
+  // Do NOT use redirect("/login") in Server Components — it sends 308
+  // (Permanent Redirect) which the browser caches permanently, causing
+  // redirect loops after the user logs in.
   if (!user) {
-    redirect("/login");
+    return null;
   }
 
   const { data: conversation, error } = await supabase

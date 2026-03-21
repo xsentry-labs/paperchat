@@ -31,7 +31,14 @@ async def lifespan(app: FastAPI):
     # Shutdown (nothing to clean up currently)
 
 
-app = FastAPI(title="Paperchat Backend", version="0.1.0", lifespan=lifespan)
+app = FastAPI(
+    title="Paperchat Backend",
+    version="0.1.0",
+    lifespan=lifespan,
+    # Disable automatic trailing-slash redirects (307/308) which can cause
+    # redirect loops when combined with Next.js rewrite proxying.
+    redirect_slashes=False,
+)
 
 app.add_middleware(
     CORSMiddleware,
