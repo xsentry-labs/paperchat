@@ -18,11 +18,9 @@ async def get_profile(user: AuthUser = Depends(get_current_user)):
         supabase.table("profiles")
         .select("*")
         .eq("id", user.id)
-        .single()
+        .maybe_single()
         .execute()
     )
-    if not result.data:
-        raise HTTPException(status_code=404, detail="Profile not found")
     return {"profile": result.data}
 
 
