@@ -1,11 +1,11 @@
 /**
- * Entity extraction using compromise.js — a lightweight, pure-JS NLP library.
+ * Entity extraction using compromise.js - a lightweight, pure-JS NLP library.
  *
  * Why compromise?
  *   - Zero API calls, runs fully server-side in Node.js
  *   - Handles People, Places, Organizations out of the box
  *   - ~300KB, no native bindings needed
- *   - "Good enough" extraction — we don't need perfect NLP
+ *   - "Good enough" extraction - we don't need perfect NLP
  *
  * What we extract per chunk:
  *   - People (proper names identified as persons)
@@ -56,7 +56,7 @@ export function extractEntities(text: string): ExtractedEntity[] {
     add(n, "organization")
   );
 
-  // Key nouns as "concepts" — useful for technical documents
+  // Key nouns as "concepts" - useful for technical documents
   // Only add if not already captured above, and only single-word nouns to reduce noise
   if (entities.length < MAX_ENTITIES) {
     (doc.nouns().out("array") as string[]).forEach((n) => {

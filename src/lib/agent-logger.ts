@@ -1,5 +1,5 @@
 /**
- * Agent activity logger — structured execution traces.
+ * Agent activity logger - structured execution traces.
  *
  * Records WHAT the agent did for each query, not chain-of-thought.
  * Each log entry contains:

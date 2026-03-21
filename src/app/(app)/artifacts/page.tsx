@@ -8,7 +8,7 @@ import { StatusDot } from "@/components/file-explorer/StatusDot";
 import { UploadButton } from "@/components/file-explorer/UploadButton";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 
-// Dynamic import: KnowledgeGraph uses canvas APIs — must be client-only
+// Dynamic import: KnowledgeGraph uses canvas APIs - must be client-only
 const KnowledgeGraph = dynamic(
   () => import("@/components/graph/KnowledgeGraph").then((m) => ({ default: m.KnowledgeGraph })),
   { ssr: false, loading: () => <div className="flex h-full items-center justify-center"><p className="text-xs text-muted-foreground/40 animate-pulse">Loading graph…</p></div> }
@@ -17,15 +17,17 @@ const KnowledgeGraph = dynamic(
 type FolderType = "pdf" | "txt" | "md" | "docx" | "pptx" | "xlsx" | "html" | "epub";
 type TabType = "files" | "graph";
 
+const FOLDER_COLOR = "#71717a";
+
 const FOLDERS: { type: FolderType; label: string; mimeType: string; color: string }[] = [
-  { type: "pdf",  label: "PDFs",         mimeType: "application/pdf",                                                                                  color: "#e5484d" },
-  { type: "docx", label: "Word",          mimeType: "application/vnd.openxmlformats-officedocument.wordprocessingml.document",                          color: "#3b82f6" },
-  { type: "pptx", label: "Slides",        mimeType: "application/vnd.openxmlformats-officedocument.presentationml.presentation",                        color: "#f97316" },
-  { type: "xlsx", label: "Spreadsheets",  mimeType: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",                                color: "#22c55e" },
-  { type: "txt",  label: "Text",          mimeType: "text/plain",                                                                                       color: "#a0a0a0" },
-  { type: "md",   label: "Markdown",      mimeType: "text/markdown",                                                                                    color: "#a0a0a0" },
-  { type: "html", label: "HTML",          mimeType: "text/html",                                                                                        color: "#f59e0b" },
-  { type: "epub", label: "Books",         mimeType: "application/epub+zip",                                                                             color: "#a78bfa" },
+  { type: "pdf",  label: "PDFs",         mimeType: "application/pdf",                                                                                  color: FOLDER_COLOR },
+  { type: "docx", label: "Word",          mimeType: "application/vnd.openxmlformats-officedocument.wordprocessingml.document",                          color: FOLDER_COLOR },
+  { type: "pptx", label: "Slides",        mimeType: "application/vnd.openxmlformats-officedocument.presentationml.presentation",                        color: FOLDER_COLOR },
+  { type: "xlsx", label: "Spreadsheets",  mimeType: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",                                color: FOLDER_COLOR },
+  { type: "txt",  label: "Text",          mimeType: "text/plain",                                                                                       color: FOLDER_COLOR },
+  { type: "md",   label: "Markdown",      mimeType: "text/markdown",                                                                                    color: FOLDER_COLOR },
+  { type: "html", label: "HTML",          mimeType: "text/html",                                                                                        color: FOLDER_COLOR },
+  { type: "epub", label: "Books",         mimeType: "application/epub+zip",                                                                             color: FOLDER_COLOR },
 ];
 
 function formatSize(bytes: number): string {
@@ -271,10 +273,10 @@ export default function ArtifactsPage() {
                 <div className="w-44">
                   <UploadButton onFileSelect={handleUpload} loading={uploading} />
                 </div>
-                <p className="text-[10px] text-muted-foreground/30">PDF · DOCX · PPTX · XLSX · TXT · MD · HTML · EPUB — up to 50MB</p>
+                <p className="text-[10px] text-muted-foreground/30">PDF · DOCX · PPTX · XLSX · TXT · MD · HTML · EPUB - up to 50MB</p>
               </div>
 
-              {/* Folders — always shown */}
+              {/* Folders - always shown */}
               <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
                 {foldersWithCounts.map((folder) => (
                   <button

@@ -1,5 +1,5 @@
 /**
- * Model registry — comprehensive list of models available via OpenRouter.
+ * Model registry - comprehensive list of models available via OpenRouter.
  *
  * Usage:
  *   - Set OPENROUTER_API_KEY in .env to use OpenRouter (access to all models below)
@@ -77,7 +77,7 @@ export const ALL_MODELS: ModelDefinition[] = [
   {
     id: "anthropic/claude-sonnet-4-5",
     label: "Claude Sonnet 4.5",
-    description: "Anthropic — smart & balanced",
+    description: "Anthropic - smart & balanced",
     provider: "anthropic",
     costTier: "mid",
     contextK: 200,
@@ -85,7 +85,7 @@ export const ALL_MODELS: ModelDefinition[] = [
   {
     id: "anthropic/claude-haiku-4-5",
     label: "Claude Haiku 4.5",
-    description: "Anthropic — fastest Claude",
+    description: "Anthropic - fastest Claude",
     provider: "anthropic",
     costTier: "cheap",
     contextK: 200,
@@ -93,7 +93,7 @@ export const ALL_MODELS: ModelDefinition[] = [
   {
     id: "anthropic/claude-opus-4",
     label: "Claude Opus 4",
-    description: "Anthropic — most capable",
+    description: "Anthropic - most capable",
     provider: "anthropic",
     costTier: "premium",
     contextK: 200,
@@ -102,7 +102,7 @@ export const ALL_MODELS: ModelDefinition[] = [
   {
     id: "google/gemini-2.0-flash-001",
     label: "Gemini 2.0 Flash",
-    description: "Google — fast multimodal",
+    description: "Google - fast multimodal",
     provider: "google",
     costTier: "cheap",
     contextK: 1000,
@@ -110,7 +110,7 @@ export const ALL_MODELS: ModelDefinition[] = [
   {
     id: "google/gemini-2.5-pro-preview-03-25",
     label: "Gemini 2.5 Pro",
-    description: "Google — long context, powerful",
+    description: "Google - long context, powerful",
     provider: "google",
     costTier: "premium",
     contextK: 1000,
@@ -136,7 +136,7 @@ export const ALL_MODELS: ModelDefinition[] = [
   {
     id: "mistralai/mistral-small-3.1-24b-instruct",
     label: "Mistral Small 3.1",
-    description: "Mistral — efficient & capable",
+    description: "Mistral - efficient & capable",
     provider: "mistral",
     costTier: "cheap",
     contextK: 128,
@@ -145,7 +145,7 @@ export const ALL_MODELS: ModelDefinition[] = [
   {
     id: "deepseek/deepseek-chat-v3-0324",
     label: "DeepSeek V3",
-    description: "DeepSeek — strong reasoning, low cost",
+    description: "DeepSeek - strong reasoning, low cost",
     provider: "deepseek",
     costTier: "cheap",
     contextK: 64,
@@ -153,7 +153,7 @@ export const ALL_MODELS: ModelDefinition[] = [
   {
     id: "deepseek/deepseek-r1",
     label: "DeepSeek R1",
-    description: "DeepSeek — advanced reasoning",
+    description: "DeepSeek - advanced reasoning",
     provider: "deepseek",
     costTier: "mid",
     contextK: 64,

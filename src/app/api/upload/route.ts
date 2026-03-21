@@ -83,7 +83,7 @@ export async function POST(request: Request) {
     );
   }
 
-  // Run ingestion directly (awaited — blocks response until done)
+  // Run ingestion directly (awaited - blocks response until done)
   try {
     await ingestDocument(doc.id);
   } catch (err) {

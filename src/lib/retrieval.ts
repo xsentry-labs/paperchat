@@ -20,7 +20,7 @@ export async function retrieveChunks(
   query: string,
   docIds: string[],
   userId: string,
-  k: number = 6
+  k: number = 5
 ): Promise<RetrievedChunk[]> {
   const queryEmbedding = await embedText(query);
   const admin = createAdminClient();
@@ -70,7 +70,7 @@ export async function retrieveChunksHybrid(
   query: string,
   docIds: string[],
   userId: string,
-  k: number = 6
+  k: number = 5
 ): Promise<HybridRetrievalResult> {
   // Step 1: Embedding-based retrieval
   const initialChunks = await retrieveChunks(query, docIds, userId, k);
@@ -92,7 +92,7 @@ export async function retrieveChunksHybrid(
   const entityIds = chunkEntities.map((e) => e.entity_id);
   const entitiesUsed = chunkEntities.map((e) => ({ name: e.name, type: e.type }));
 
-  // Step 3: Expand via graph — find related chunks sharing the same entities
+  // Step 3: Expand via graph - find related chunks sharing the same entities
   const expandedIds = await expandByEntities(entityIds, initialIds, 3);
 
   if (expandedIds.length === 0) {

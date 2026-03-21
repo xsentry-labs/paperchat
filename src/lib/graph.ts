@@ -1,11 +1,11 @@
 /**
- * Knowledge graph operations — stored relationally in PostgreSQL.
+ * Knowledge graph operations - stored relationally in PostgreSQL.
  *
  * Visualization model (Obsidian-style):
  *   Nodes  = Documents
  *   Edges  = Two documents share ≥1 entity (weighted by shared entity count)
  *
- * Entity extraction still happens per-chunk during ingestion — entities are the
+ * Entity extraction still happens per-chunk during ingestion - entities are the
  * mechanism for finding document relationships, but they don't appear as nodes
  * in the frontend graph.
  */
@@ -26,6 +26,7 @@ export interface GraphNode {
   id: string;
   type: "document";
   label: string;
+  summary?: string | null;
   degree?: number; // number of other documents this doc links to
 }
 
@@ -149,7 +150,7 @@ export async function buildGraphForUser(userId: string): Promise<{
   // 1. Fetch all ready documents
   const { data: docs } = await admin
     .from("documents")
-    .select("id, filename")
+    .select("id, filename, summary")
     .eq("user_id", userId)
     .eq("status", "ready");
 
@@ -230,6 +231,7 @@ export async function buildGraphForUser(userId: string): Promise<{
     id: d.id,
     type: "document",
     label: d.filename,
+    summary: d.summary ?? null,
     degree: degreeMap.get(d.id) ?? 0,
   }));
 

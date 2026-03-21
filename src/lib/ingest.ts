@@ -180,7 +180,7 @@ async function parseDocument(blob: Blob, mimeType: string): Promise<ParsedDocume
   }
 }
 
-// ── PDF — with OCR fallback for scanned documents ────────────────────────────
+// ── PDF - with OCR fallback for scanned documents ────────────────────────────
 
 async function parsePdf(blob: Blob): Promise<ParsedDocument> {
   const { extractText } = await import("unpdf");
@@ -195,15 +195,15 @@ async function parsePdf(blob: Blob): Promise<ParsedDocument> {
   }));
   const fullText = pages.map((p) => p.text).join("\n\n");
 
-  // Scanned PDF detection — fall back to Tesseract OCR if text is too sparse
+  // Scanned PDF detection - fall back to Tesseract OCR if text is too sparse
   if (isLikelyScanned(fullText, pages.length)) {
     console.log(
-      `[ingest] PDF appears scanned (${pages.length} pages, low text density) — running OCR`
+      `[ingest] PDF appears scanned (${pages.length} pages, low text density) - running OCR`
     );
     try {
       const ocr = await ocrPdf(buffer, pages.length);
       if (ocr.text.trim().length > fullText.trim().length) {
-        // OCR produced more text — use it
+        // OCR produced more text - use it
         return { text: ocr.text, pages: ocr.pages, ocrUsed: true };
       }
     } catch (err) {
@@ -240,7 +240,7 @@ async function parseDocx(blob: Blob): Promise<ParsedDocument> {
   return { text: result.value };
 }
 
-// ── PPTX — Microsoft PowerPoint ──────────────────────────────────────────────
+// ── PPTX - Microsoft PowerPoint ──────────────────────────────────────────────
 // officeparser extracts text from all slides in order.
 
 async function parsePptx(blob: Blob): Promise<ParsedDocument> {
@@ -252,7 +252,7 @@ async function parsePptx(blob: Blob): Promise<ParsedDocument> {
   return { text: cleanOfficeText(text) };
 }
 
-// ── XLSX — Microsoft Excel ────────────────────────────────────────────────────
+// ── XLSX - Microsoft Excel ────────────────────────────────────────────────────
 // Converts each sheet to a readable text table (tab-separated).
 
 async function parseXlsx(blob: Blob): Promise<ParsedDocument> {

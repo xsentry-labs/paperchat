@@ -1,7 +1,7 @@
 "use client";
 
 /**
- * /activity — Agent execution trace log.
+ * /activity - Agent execution trace log.
  *
  * Shows every query the agent processed: what it retrieved, which entities
  * it used, timing per pipeline step, and the final output.
@@ -58,17 +58,10 @@ function formatMs(ms: number): string {
   return `${(ms / 1000).toFixed(1)}s`;
 }
 
-const ENTITY_COLORS: Record<string, string> = {
-  person: "bg-blue-500/10 text-blue-400 border-blue-500/20",
-  place: "bg-emerald-500/10 text-emerald-400 border-emerald-500/20",
-  organization: "bg-orange-500/10 text-orange-400 border-orange-500/20",
-  concept: "bg-purple-500/10 text-purple-400 border-purple-500/20",
-};
-
 const STEP_COLORS: Record<string, string> = {
-  retrieval: "bg-sky-500",
-  graph_expansion: "bg-purple-500",
-  generation: "bg-amber-500",
+  retrieval: "bg-foreground/30",
+  graph_expansion: "bg-foreground/20",
+  generation: "bg-foreground/40",
 };
 
 const STEP_LABELS: Record<string, string> = {
@@ -219,12 +212,9 @@ function LogEntry({ log }: { log: AgentLog }) {
                 {log.entities_used.map((e, i) => (
                   <span
                     key={i}
-                    className={`inline-flex items-center rounded-md border px-2 py-0.5 text-[10px] ${
-                      ENTITY_COLORS[e.type] ?? ENTITY_COLORS.concept
-                    }`}
+                    className="inline-flex items-center rounded-md border border-border/30 bg-white/[0.04] px-2 py-0.5 text-[10px] text-foreground/50"
                   >
                     {e.name}
-                    <span className="ml-1 opacity-50">{e.type[0]}</span>
                   </span>
                 ))}
               </div>
@@ -258,7 +248,7 @@ function LogEntry({ log }: { log: AgentLog }) {
                       <div className="flex items-center gap-1.5 shrink-0">
                         <div className="h-1 w-12 rounded-full bg-border/40 overflow-hidden">
                           <div
-                            className="h-full bg-sky-500/60 rounded-full"
+                            className="h-full bg-foreground/30 rounded-full"
                             style={{ width: `${c.similarity * 100}%` }}
                           />
                         </div>
@@ -268,7 +258,7 @@ function LogEntry({ log }: { log: AgentLog }) {
                       </div>
                     )}
                     {c.similarity === 0 && (
-                      <span className="text-[9px] text-purple-400/60 shrink-0">graph</span>
+                      <span className="text-[9px] text-muted-foreground/40 shrink-0">graph</span>
                     )}
                   </div>
                 ))}
@@ -382,7 +372,7 @@ export default function ActivityPage() {
               />
             </svg>
             <p className="text-xs text-muted-foreground/40">
-              No activity yet — ask a question to see traces here.
+              No activity yet - ask a question to see traces here.
             </p>
           </div>
         ) : (
