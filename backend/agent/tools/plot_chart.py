@@ -47,11 +47,20 @@ class PlotChartTool(Tool):
     async def execute(self, code: str, width: int = 8, height: int = 5) -> str:
         import sys
         import traceback
-        import matplotlib
-        matplotlib.use("Agg")
-        import matplotlib.pyplot as plt
-        import numpy as np
-        import pandas as pd
+        try:
+            import matplotlib
+            matplotlib.use("Agg")
+            import matplotlib.pyplot as plt
+        except ImportError:
+            return "[plot_chart] matplotlib is not installed in this environment."
+        try:
+            import numpy as np
+        except ImportError:
+            np = None
+        try:
+            import pandas as pd
+        except ImportError:
+            pd = None
 
         plt.figure(figsize=(width, height))
 
