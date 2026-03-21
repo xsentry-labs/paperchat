@@ -11,12 +11,10 @@ beautifulsoup4>=4.12.0
 lxml>=5.0.0
 ebooklib>=0.18
 spacy>=3.7.0
-# spaCy model installed as a pip package so Vercel bundles it at build time
 https://github.com/explosion/spacy-models/releases/download/en_core_web_sm-3.7.1/en_core_web_sm-3.7.1-py3-none-any.whl
 httpx>=0.27.0
 pandas>=2.2.0
 numpy>=1.26.0
-matplotlib>=3.8.0
 cryptography>=42.0.0
 python-dotenv>=1.0.0
 pydantic-settings>=2.4.0
