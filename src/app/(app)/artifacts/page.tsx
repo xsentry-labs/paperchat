@@ -14,14 +14,18 @@ const KnowledgeGraph = dynamic(
   { ssr: false, loading: () => <div className="flex h-full items-center justify-center"><p className="text-xs text-muted-foreground/40 animate-pulse">Loading graph…</p></div> }
 );
 
-type FolderType = "pdf" | "txt" | "md" | "docx";
+type FolderType = "pdf" | "txt" | "md" | "docx" | "pptx" | "xlsx" | "html" | "epub";
 type TabType = "files" | "graph";
 
 const FOLDERS: { type: FolderType; label: string; mimeType: string; color: string }[] = [
-  { type: "pdf", label: "PDFs", mimeType: "application/pdf", color: "#e5484d" },
-  { type: "txt", label: "Text Files", mimeType: "text/plain", color: "#a0a0a0" },
-  { type: "md", label: "Markdown", mimeType: "text/markdown", color: "#a0a0a0" },
-  { type: "docx", label: "Documents", mimeType: "application/vnd.openxmlformats-officedocument.wordprocessingml.document", color: "#3b82f6" },
+  { type: "pdf",  label: "PDFs",         mimeType: "application/pdf",                                                                                  color: "#e5484d" },
+  { type: "docx", label: "Word",          mimeType: "application/vnd.openxmlformats-officedocument.wordprocessingml.document",                          color: "#3b82f6" },
+  { type: "pptx", label: "Slides",        mimeType: "application/vnd.openxmlformats-officedocument.presentationml.presentation",                        color: "#f97316" },
+  { type: "xlsx", label: "Spreadsheets",  mimeType: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",                                color: "#22c55e" },
+  { type: "txt",  label: "Text",          mimeType: "text/plain",                                                                                       color: "#a0a0a0" },
+  { type: "md",   label: "Markdown",      mimeType: "text/markdown",                                                                                    color: "#a0a0a0" },
+  { type: "html", label: "HTML",          mimeType: "text/html",                                                                                        color: "#f59e0b" },
+  { type: "epub", label: "Books",         mimeType: "application/epub+zip",                                                                             color: "#a78bfa" },
 ];
 
 function formatSize(bytes: number): string {
@@ -267,7 +271,7 @@ export default function ArtifactsPage() {
                 <div className="w-44">
                   <UploadButton onFileSelect={handleUpload} loading={uploading} />
                 </div>
-                <p className="text-[10px] text-muted-foreground/30">PDF, TXT, MD, DOCX up to 50MB</p>
+                <p className="text-[10px] text-muted-foreground/30">PDF · DOCX · PPTX · XLSX · TXT · MD · HTML · EPUB — up to 50MB</p>
               </div>
 
               {/* Folders — always shown */}
