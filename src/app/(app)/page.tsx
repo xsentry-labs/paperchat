@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { ModelSelector } from "@/components/chat/ModelSelector";
 import type { ModelKey } from "@/lib/llm";
+import { authFetch } from "@/lib/auth-fetch";
 
 export default function HomePage() {
   const [input, setInput] = useState("");
@@ -12,7 +13,7 @@ export default function HomePage() {
   const router = useRouter();
 
   useEffect(() => {
-    fetch("/api/profile").then(async (res) => {
+    authFetch("/api/profile").then(async (res) => {
       if (res.ok) {
         const { profile } = await res.json();
         if (profile?.preferred_model) setCurrentModel(profile.preferred_model as ModelKey);
@@ -22,7 +23,7 @@ export default function HomePage() {
 
   function handleModelChange(model: ModelKey) {
     setCurrentModel(model);
-    fetch("/api/profile", {
+    authFetch("/api/profile", {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ preferred_model: model }),
@@ -35,7 +36,7 @@ export default function HomePage() {
     if (!text || loading) return;
     setLoading(true);
 
-    const res = await fetch("/api/conversations", {
+    const res = await authFetch("/api/conversations", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ title: text.slice(0, 60) }),

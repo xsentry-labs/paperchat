@@ -8,6 +8,7 @@ import { FileIcon } from "./FileIcon";
 import { StatusDot } from "./StatusDot";
 import { UploadButton } from "./UploadButton";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
+import { authFetch } from "@/lib/auth-fetch";
 
 const PAGE_SIZE = 20;
 
@@ -23,7 +24,7 @@ export function FileExplorer() {
 
   const fetchDocuments = useCallback(async () => {
     try {
-      const res = await fetch("/api/documents");
+      const res = await authFetch("/api/documents");
       if (!res.ok) return;
       const data = await res.json();
       setDocuments(data.documents);
@@ -73,7 +74,7 @@ export function FileExplorer() {
         files.map(async (file) => {
           const formData = new FormData();
           formData.append("file", file);
-          const res = await fetch("/api/upload", { method: "POST", body: formData });
+          const res = await authFetch("/api/upload", { method: "POST", body: formData });
           if (!res.ok) {
             const data = await res.json();
             return data.error ?? `Failed to upload "${file.name}"`;
@@ -99,7 +100,7 @@ export function FileExplorer() {
     setDeletingId(docId);
 
     try {
-      const res = await fetch(`/api/documents?id=${encodeURIComponent(docId)}`, {
+      const res = await authFetch(`/api/documents?id=${encodeURIComponent(docId)}`, {
         method: "DELETE",
       });
 
@@ -121,7 +122,7 @@ export function FileExplorer() {
     if (doc.status !== "ready") return;
 
     try {
-      const res = await fetch("/api/conversations", {
+      const res = await authFetch("/api/conversations", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({

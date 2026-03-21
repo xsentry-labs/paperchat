@@ -10,6 +10,7 @@
 
 import { useEffect, useRef, useState, useCallback } from "react";
 import { useTheme } from "@/components/ThemeProvider";
+import { authFetch } from "@/lib/auth-fetch";
 
 // ── Types ──────────────────────────────────────────────────────────────────
 
@@ -197,7 +198,7 @@ export function KnowledgeGraph() {
   // ── Fetch ────────────────────────────────────────────────────────────────
   useEffect(() => {
     let cancelled = false;
-    fetch("/api/graph")
+    authFetch("/api/graph")
       .then((r) => r.json())
       .then((data: GraphData) => {
         if (cancelled) return;
