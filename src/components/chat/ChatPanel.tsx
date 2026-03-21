@@ -144,6 +144,7 @@ export function ChatPanel({ conversationId, initialQuestion }: ChatPanelProps) {
     },
     onFinish() {
       setChatError(null);
+      window.dispatchEvent(new Event("conversation-updated"));
       setTimeout(() => {
         Promise.all([
           fetch(`/api/conversations/${conversationId}/messages`).then((r) => r.json()),

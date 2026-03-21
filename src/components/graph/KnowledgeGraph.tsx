@@ -1,14 +1,11 @@
 "use client";
 
 /**
- * KnowledgeGraph — minimal Obsidian-style force-directed graph.
+ * KnowledgeGraph — Obsidian-style document relationship graph.
  *
- * Features:
- *   - Canvas force simulation (no external library)
- *   - Zoom (mousewheel) + Pan (drag background)
- *   - Entity type filters (toggle which node types are shown)
- *   - Node search (highlights matching nodes, dims others)
- *   - Click a node → detail panel (which docs mention it / entity count)
+ * Nodes  = Documents (sized by connection count)
+ * Edges  = Two documents share entities (thickness = shared entity count)
+ * Click  = Detail panel showing which documents link here and shared topics
  */
 
 import { useEffect, useRef, useState, useCallback } from "react";
@@ -17,10 +14,8 @@ import { useEffect, useRef, useState, useCallback } from "react";
 
 interface GraphNode {
   id: string;
-  type: "document" | "entity";
   label: string;
-  entityType?: string;
-  weight?: number; // chunk frequency — drives node radius
+  degree: number;
   x?: number;
   y?: number;
   vx?: number;
@@ -30,7 +25,8 @@ interface GraphNode {
 interface GraphEdge {
   source: string;
   target: string;
-  type: string;
+  weight: number;
+  sharedEntities: string[];
 }
 
 interface GraphData {
@@ -38,103 +34,59 @@ interface GraphData {
   edges: GraphEdge[];
 }
 
-// ── Colors & sizes ──────────────────────────────────────────────────────────
+// ── Constants ──────────────────────────────────────────────────────────────
 
-export const ENTITY_TYPE_COLORS: Record<string, string> = {
-  document: "#e2e8f0",
-  person: "#60a5fa",
-  place: "#34d399",
-  organization: "#fb923c",
-  concept: "#a78bfa",
-};
+const NODE_COLOR = "#e2e8f0";
+const EDGE_COLOR = "rgba(148,163,184,0.18)";
+const EDGE_HIGHLIGHT = "rgba(148,163,184,0.55)";
+const LABEL_COLOR = "rgba(226,232,240,0.85)";
+const LABEL_DIM = "rgba(148,163,184,0.2)";
 
-const ENTITY_TYPES = ["person", "place", "organization", "concept"] as const;
-type EntityType = (typeof ENTITY_TYPES)[number];
+const REPULSION = 6000;
+const ATTRACTION = 0.04;
+const DAMPING = 0.80;
+const CENTER_PULL = 0.008;
 
-const TYPE_LABELS: Record<string, string> = {
-  person: "People",
-  place: "Places",
-  organization: "Orgs",
-  concept: "Concepts",
-};
+// ── Node radius: 7–18px based on degree ───────────────────────────────────
 
-function nodeColor(node: GraphNode): string {
-  if (node.type === "document") return ENTITY_TYPE_COLORS.document;
-  return ENTITY_TYPE_COLORS[node.entityType ?? "concept"] ?? ENTITY_TYPE_COLORS.concept;
+function nodeRadius(degree: number): number {
+  return Math.max(7, Math.min(18, 7 + Math.sqrt(degree) * 2.8));
 }
 
-function nodeRadius(node: GraphNode): number {
-  if (node.type === "document") return 10;
-  // Entity radius: 3–8 px based on how many chunks reference it
-  const w = node.weight ?? 1;
-  return Math.max(3, Math.min(8, 3 + Math.sqrt(w) * 1.2));
-}
+// ── Detail Panel ──────────────────────────────────────────────────────────
 
-// ── Physics ─────────────────────────────────────────────────────────────────
-
-const REPULSION = 4000;
-const ATTRACTION = 0.035;
-const DAMPING = 0.82;
-const CENTER_PULL = 0.01;
-
-// ── Detail Panel ─────────────────────────────────────────────────────────────
-
-interface DetailPanelProps {
+function DetailPanel({
+  node,
+  edges,
+  allNodes,
+  onClose,
+}: {
   node: GraphNode;
   edges: GraphEdge[];
   allNodes: GraphNode[];
   onClose: () => void;
-}
-
-function DetailPanel({ node, edges, allNodes, onClose }: DetailPanelProps) {
+}) {
   const nodeById = new Map(allNodes.map((n) => [n.id, n]));
-
-  // For a document: list connected entities
-  // For an entity: list connected documents
-  const connected =
-    node.type === "document"
-      ? edges
-          .filter((e) => e.source === node.id || e.target === node.id)
-          .map((e) => nodeById.get(e.source === node.id ? e.target : e.source))
-          .filter(Boolean) as GraphNode[]
-      : edges
-          .filter((e) => e.source === node.id || e.target === node.id)
-          .map((e) => nodeById.get(e.source === node.id ? e.target : e.source))
-          .filter(Boolean) as GraphNode[];
-
-  const entityGroups =
-    node.type === "document"
-      ? ENTITY_TYPES.map((t) => ({
-          type: t,
-          items: connected.filter((n) => n.entityType === t),
-        })).filter((g) => g.items.length > 0)
-      : [];
+  const links = edges
+    .filter((e) => e.source === node.id || e.target === node.id)
+    .sort((a, b) => b.weight - a.weight)
+    .map((e) => ({
+      peer: nodeById.get(e.source === node.id ? e.target : e.source)!,
+      weight: e.weight,
+      shared: e.sharedEntities,
+    }))
+    .filter((l) => l.peer);
 
   return (
-    <div className="absolute top-3 right-3 w-56 rounded-xl border border-border/40 bg-[#0a0a0f]/95 backdrop-blur-sm shadow-xl p-3 animate-fade-in z-10">
-      <div className="flex items-start justify-between mb-2">
-        <div className="min-w-0">
-          <div className="flex items-center gap-1.5 mb-0.5">
-            <div
-              className="h-2 w-2 rounded-full shrink-0"
-              style={{
-                backgroundColor:
-                  node.type === "document"
-                    ? ENTITY_TYPE_COLORS.document
-                    : ENTITY_TYPE_COLORS[node.entityType ?? "concept"],
-              }}
-            />
-            <span className="text-[9px] uppercase tracking-wider text-muted-foreground/40">
-              {node.type === "document" ? "Document" : node.entityType}
-            </span>
-          </div>
-          <p className="text-xs text-foreground/80 break-words leading-snug">
-            {node.label}
-          </p>
+    <div className="absolute top-3 right-3 w-60 rounded-xl border border-white/10 bg-[#08080d]/95 backdrop-blur-sm shadow-2xl p-3 z-10">
+      <div className="flex items-start justify-between mb-3">
+        <div className="min-w-0 pr-2">
+          <p className="text-[9px] uppercase tracking-widest text-slate-600 mb-1">Document</p>
+          <p className="text-xs text-slate-200 leading-snug break-words">{node.label}</p>
         </div>
         <button
           onClick={onClose}
-          className="shrink-0 ml-2 text-muted-foreground/30 hover:text-muted-foreground transition-colors"
+          className="shrink-0 text-slate-700 hover:text-slate-400 transition-colors mt-0.5"
         >
           <svg className="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
             <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
@@ -142,63 +94,47 @@ function DetailPanel({ node, edges, allNodes, onClose }: DetailPanelProps) {
         </button>
       </div>
 
-      <div className="border-t border-border/20 pt-2">
-        {node.type === "document" ? (
-          <>
-            <p className="text-[10px] text-muted-foreground/40 mb-2">
-              {connected.length} entit{connected.length !== 1 ? "ies" : "y"} extracted
-            </p>
-            {entityGroups.map(({ type, items }) => (
-              <div key={type} className="mb-2">
-                <p className="text-[9px] uppercase tracking-wider text-muted-foreground/30 mb-1">
-                  {TYPE_LABELS[type]}
-                </p>
+      {links.length === 0 ? (
+        <p className="text-[10px] text-slate-600">No links yet — upload more documents.</p>
+      ) : (
+        <>
+          <p className="text-[9px] uppercase tracking-widest text-slate-600 mb-2">
+            Linked to {links.length} document{links.length !== 1 ? "s" : ""}
+          </p>
+          <div className="space-y-2 max-h-48 overflow-y-auto pr-0.5">
+            {links.map(({ peer, weight, shared }) => (
+              <div key={peer.id} className="rounded-lg bg-white/[0.03] border border-white/5 p-2">
+                <div className="flex items-center justify-between mb-1">
+                  <span className="text-[10px] text-slate-300 leading-snug truncate pr-2">
+                    {peer.label}
+                  </span>
+                  <span className="shrink-0 text-[9px] text-slate-600">
+                    {weight} shared
+                  </span>
+                </div>
                 <div className="flex flex-wrap gap-1">
-                  {items.slice(0, 8).map((n) => (
+                  {shared.slice(0, 5).map((s) => (
                     <span
-                      key={n.id}
-                      className="text-[9px] rounded px-1.5 py-0.5"
-                      style={{
-                        backgroundColor:
-                          ENTITY_TYPE_COLORS[type] + "18",
-                        color: ENTITY_TYPE_COLORS[type] + "cc",
-                      }}
+                      key={s}
+                      className="text-[8px] rounded px-1 py-0.5 bg-slate-800/60 text-slate-500"
                     >
-                      {n.label}
+                      {s}
                     </span>
                   ))}
-                  {items.length > 8 && (
-                    <span className="text-[9px] text-muted-foreground/30">
-                      +{items.length - 8}
-                    </span>
+                  {shared.length > 5 && (
+                    <span className="text-[8px] text-slate-700">+{shared.length - 5}</span>
                   )}
                 </div>
               </div>
             ))}
-          </>
-        ) : (
-          <>
-            <p className="text-[10px] text-muted-foreground/40 mb-2">
-              Mentioned in {connected.length} document{connected.length !== 1 ? "s" : ""}
-            </p>
-            <div className="space-y-1">
-              {connected.map((n) => (
-                <div key={n.id} className="flex items-center gap-1.5">
-                  <div className="h-1.5 w-1.5 rounded-full bg-slate-400/40 shrink-0" />
-                  <span className="text-[10px] text-foreground/50 truncate">
-                    {n.label}
-                  </span>
-                </div>
-              ))}
-            </div>
-          </>
-        )}
-      </div>
+          </div>
+        </>
+      )}
     </div>
   );
 }
 
-// ── Main Component ───────────────────────────────────────────────────────────
+// ── Main component ─────────────────────────────────────────────────────────
 
 export function KnowledgeGraph() {
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -206,26 +142,19 @@ export function KnowledgeGraph() {
   const nodesRef = useRef<GraphNode[]>([]);
   const animRef = useRef<number>(0);
 
-  // Interaction state — stored in refs to avoid triggering re-renders per frame
   const hoveredRef = useRef<string | null>(null);
   const selectedRef = useRef<string | null>(null);
-
-  // Camera transform
   const transformRef = useRef({ x: 0, y: 0, scale: 1 });
   const isPanningRef = useRef(false);
   const panStartRef = useRef({ mx: 0, my: 0, tx: 0, ty: 0 });
 
-  // UI state
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [stats, setStats] = useState({ nodes: 0, edges: 0 });
   const [selectedNode, setSelectedNode] = useState<GraphNode | null>(null);
-  const [activeFilters, setActiveFilters] = useState<Set<EntityType>>(
-    new Set(ENTITY_TYPES)
-  );
   const [search, setSearch] = useState("");
+  const [docCount, setDocCount] = useState(0);
 
-  // ── Fetch ──────────────────────────────────────────────────────────────────
+  // ── Fetch ────────────────────────────────────────────────────────────────
   useEffect(() => {
     let cancelled = false;
     fetch("/api/graph")
@@ -233,7 +162,7 @@ export function KnowledgeGraph() {
       .then((data: GraphData) => {
         if (cancelled) return;
         dataRef.current = data;
-        setStats({ nodes: data.nodes.length, edges: data.edges.length });
+        setDocCount(data.nodes.length);
         setLoading(false);
       })
       .catch(() => {
@@ -242,26 +171,12 @@ export function KnowledgeGraph() {
     return () => { cancelled = true; };
   }, []);
 
-  // ── Visible nodes (after filters + search) ────────────────────────────────
-  const getVisibleNodeIds = useCallback((): Set<string> => {
-    const q = search.trim().toLowerCase();
-    const ids = new Set<string>();
-    for (const n of dataRef.current.nodes) {
-      if (n.type === "document") {
-        ids.add(n.id); // documents always shown
-      } else if (activeFilters.has(n.entityType as EntityType)) {
-        if (!q || n.label.includes(q)) ids.add(n.id);
-      }
-    }
-    return ids;
-  }, [activeFilters, search]);
-
-  // ── Physics nodes init ─────────────────────────────────────────────────────
+  // ── Init node positions ──────────────────────────────────────────────────
   const initNodes = useCallback((canvas: HTMLCanvasElement) => {
     const cx = canvas.width / 2;
     const cy = canvas.height / 2;
     const count = dataRef.current.nodes.length || 1;
-    const r = Math.min(cx, cy) * 0.45;
+    const r = Math.min(cx, cy) * 0.4;
     nodesRef.current = dataRef.current.nodes.map((n, i) => ({
       ...n,
       x: cx + r * Math.cos((2 * Math.PI * i) / count),
@@ -271,150 +186,144 @@ export function KnowledgeGraph() {
     }));
   }, []);
 
-  // ── Tick (physics + draw) ──────────────────────────────────────────────────
-  const tick = useCallback(
-    (canvas: HTMLCanvasElement) => {
-      const nodes = nodesRef.current;
-      if (nodes.length === 0) return;
+  // ── Physics + draw tick ──────────────────────────────────────────────────
+  const tick = useCallback((canvas: HTMLCanvasElement) => {
+    const nodes = nodesRef.current;
+    if (nodes.length === 0) return;
 
-      const visibleIds = getVisibleNodeIds();
-      const visibleNodes = nodes.filter((n) => visibleIds.has(n.id));
-      const cx = canvas.width / 2;
-      const cy = canvas.height / 2;
+    const q = search.trim().toLowerCase();
+    const cx = canvas.width / 2;
+    const cy = canvas.height / 2;
+    const nodeById = new Map(nodes.map((n) => [n.id, n]));
+    const edges = dataRef.current.edges;
 
-      // Build fast lookup
-      const nodeById = new Map(nodes.map((n) => [n.id, n]));
+    // Build adjacency for highlight
+    const adjMap = new Map<string, Set<string>>();
+    for (const e of edges) {
+      if (!adjMap.has(e.source)) adjMap.set(e.source, new Set());
+      if (!adjMap.has(e.target)) adjMap.set(e.target, new Set());
+      adjMap.get(e.source)!.add(e.target);
+      adjMap.get(e.target)!.add(e.source);
+    }
 
-      // Build adjacency for highlight
-      const adjMap = new Map<string, Set<string>>();
-      for (const e of dataRef.current.edges) {
-        if (!adjMap.has(e.source)) adjMap.set(e.source, new Set());
-        if (!adjMap.has(e.target)) adjMap.set(e.target, new Set());
-        adjMap.get(e.source)!.add(e.target);
-        adjMap.get(e.target)!.add(e.source);
-      }
-
-      // Physics on visible nodes only
-      for (let i = 0; i < visibleNodes.length; i++) {
-        for (let j = i + 1; j < visibleNodes.length; j++) {
-          const a = visibleNodes[i];
-          const b = visibleNodes[j];
-          const dx = (b.x ?? 0) - (a.x ?? 0);
-          const dy = (b.y ?? 0) - (a.y ?? 0);
-          const dist2 = dx * dx + dy * dy + 1;
-          const f = REPULSION / dist2;
-          const d = Math.sqrt(dist2);
-          a.vx = (a.vx ?? 0) - (dx / d) * f;
-          a.vy = (a.vy ?? 0) - (dy / d) * f;
-          b.vx = (b.vx ?? 0) + (dx / d) * f;
-          b.vy = (b.vy ?? 0) + (dy / d) * f;
-        }
-      }
-
-      for (const e of dataRef.current.edges) {
-        const a = nodeById.get(e.source);
-        const b = nodeById.get(e.target);
-        if (!a || !b || !visibleIds.has(a.id) || !visibleIds.has(b.id)) continue;
+    // Repulsion
+    for (let i = 0; i < nodes.length; i++) {
+      for (let j = i + 1; j < nodes.length; j++) {
+        const a = nodes[i], b = nodes[j];
         const dx = (b.x ?? 0) - (a.x ?? 0);
         const dy = (b.y ?? 0) - (a.y ?? 0);
-        a.vx = (a.vx ?? 0) + dx * ATTRACTION;
-        a.vy = (a.vy ?? 0) + dy * ATTRACTION;
-        b.vx = (b.vx ?? 0) - dx * ATTRACTION;
-        b.vy = (b.vy ?? 0) - dy * ATTRACTION;
+        const dist2 = dx * dx + dy * dy + 1;
+        const f = REPULSION / dist2;
+        const d = Math.sqrt(dist2);
+        a.vx = (a.vx ?? 0) - (dx / d) * f;
+        a.vy = (a.vy ?? 0) - (dy / d) * f;
+        b.vx = (b.vx ?? 0) + (dx / d) * f;
+        b.vy = (b.vy ?? 0) + (dy / d) * f;
       }
+    }
 
-      for (const n of visibleNodes) {
-        n.vx = (n.vx ?? 0) * DAMPING + (cx - (n.x ?? cx)) * CENTER_PULL;
-        n.vy = (n.vy ?? 0) * DAMPING + (cy - (n.y ?? cy)) * CENTER_PULL;
-        n.x = (n.x ?? cx) + (n.vx ?? 0);
-        n.y = (n.y ?? cy) + (n.vy ?? 0);
-      }
+    // Attraction along edges (stronger for higher weight)
+    for (const e of edges) {
+      const a = nodeById.get(e.source), b = nodeById.get(e.target);
+      if (!a || !b) continue;
+      const dx = (b.x ?? 0) - (a.x ?? 0);
+      const dy = (b.y ?? 0) - (a.y ?? 0);
+      const strength = ATTRACTION * Math.log1p(e.weight);
+      a.vx = (a.vx ?? 0) + dx * strength;
+      a.vy = (a.vy ?? 0) + dy * strength;
+      b.vx = (b.vx ?? 0) - dx * strength;
+      b.vy = (b.vy ?? 0) - dy * strength;
+    }
 
-      // ── Draw ───────────────────────────────────────────────────────────────
-      const ctx = canvas.getContext("2d");
-      if (!ctx) return;
-      ctx.clearRect(0, 0, canvas.width, canvas.height);
+    // Damping + center pull
+    for (const n of nodes) {
+      n.vx = (n.vx ?? 0) * DAMPING + (cx - (n.x ?? cx)) * CENTER_PULL;
+      n.vy = (n.vy ?? 0) * DAMPING + (cy - (n.y ?? cy)) * CENTER_PULL;
+      n.x = (n.x ?? cx) + (n.vx ?? 0);
+      n.y = (n.y ?? cy) + (n.vy ?? 0);
+    }
 
-      const { x: tx, y: ty, scale } = transformRef.current;
-      ctx.save();
-      ctx.translate(tx, ty);
-      ctx.scale(scale, scale);
+    // ── Draw ──────────────────────────────────────────────────────────────
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return;
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-      const hovered = hoveredRef.current;
-      const selected = selectedRef.current;
-      const q = search.trim().toLowerCase();
-      const connectedToSelected = selected ? adjMap.get(selected) ?? new Set() : null;
+    const { x: tx, y: ty, scale } = transformRef.current;
+    ctx.save();
+    ctx.translate(tx, ty);
+    ctx.scale(scale, scale);
 
-      // Draw edges
-      for (const e of dataRef.current.edges) {
-        const a = nodeById.get(e.source);
-        const b = nodeById.get(e.target);
-        if (!a || !b || !visibleIds.has(a.id) || !visibleIds.has(b.id)) continue;
+    const hovered = hoveredRef.current;
+    const selected = selectedRef.current;
+    const connectedToSelected = selected ? adjMap.get(selected) ?? new Set() : null;
 
-        const isHighlighted = selected && (e.source === selected || e.target === selected);
-        ctx.beginPath();
-        ctx.moveTo(a.x ?? 0, a.y ?? 0);
-        ctx.lineTo(b.x ?? 0, b.y ?? 0);
-        ctx.strokeStyle = isHighlighted
-          ? "rgba(148,163,184,0.6)"
-          : "rgba(100,116,139,0.18)";
-        ctx.lineWidth = isHighlighted ? 1.2 : 0.6;
+    // Edges
+    for (const e of edges) {
+      const a = nodeById.get(e.source), b = nodeById.get(e.target);
+      if (!a || !b) continue;
+      const isHighlighted = selected && (e.source === selected || e.target === selected);
+      ctx.beginPath();
+      ctx.moveTo(a.x ?? 0, a.y ?? 0);
+      ctx.lineTo(b.x ?? 0, b.y ?? 0);
+      ctx.strokeStyle = isHighlighted ? EDGE_HIGHLIGHT : EDGE_COLOR;
+      ctx.lineWidth = isHighlighted
+        ? Math.max(1, Math.min(3, Math.log1p(e.weight)))
+        : Math.max(0.5, Math.min(2, Math.log1p(e.weight) * 0.6));
+      ctx.stroke();
+    }
+
+    // Nodes
+    for (const n of nodes) {
+      const r = nodeRadius(n.degree);
+      const isHovered = n.id === hovered;
+      const isSelected = n.id === selected;
+      const isDimBySelect = selected && n.id !== selected && !connectedToSelected?.has(n.id);
+      const isDimBySearch = q && !n.label.toLowerCase().includes(q);
+      const isDim = isDimBySelect || isDimBySearch;
+
+      // Glow
+      ctx.shadowBlur = isSelected || isHovered ? 16 : n.degree > 0 ? 4 : 0;
+      ctx.shadowColor = NODE_COLOR;
+
+      ctx.beginPath();
+      ctx.arc(n.x ?? 0, n.y ?? 0, isHovered || isSelected ? r + 2 : r, 0, Math.PI * 2);
+      ctx.fillStyle = isDim
+        ? "rgba(226,232,240,0.08)"
+        : isSelected
+        ? "#fff"
+        : isHovered
+        ? "rgba(226,232,240,0.95)"
+        : "rgba(226,232,240,0.75)";
+      ctx.fill();
+
+      // Outer ring for connected nodes
+      if (n.degree > 0 && !isDim) {
+        ctx.strokeStyle = isSelected || isHovered
+          ? "rgba(226,232,240,0.6)"
+          : "rgba(226,232,240,0.25)";
+        ctx.lineWidth = 1;
         ctx.stroke();
       }
 
-      // Draw nodes
-      for (const n of visibleNodes) {
-        const r = nodeRadius(n);
-        const color = nodeColor(n);
-        const isHovered = n.id === hovered;
-        const isSelected = n.id === selected;
-        const isDimBySelect = selected && n.id !== selected && !connectedToSelected?.has(n.id);
-        const isDimBySearch = q && !n.label.includes(q) && n.type !== "document";
+      ctx.shadowBlur = 0;
 
-        const isDim = isDimBySelect || isDimBySearch;
-
-        ctx.beginPath();
-        ctx.arc(n.x ?? 0, n.y ?? 0, isHovered || isSelected ? r + 2 : r, 0, Math.PI * 2);
-
-        ctx.shadowBlur = isSelected || isHovered ? 12 : 0;
-        ctx.shadowColor = color;
-        ctx.fillStyle = isDim ? color + "28" : isSelected ? color : color + (isHovered ? "ff" : "bb");
-        ctx.fill();
-        ctx.shadowBlur = 0;
-
-        if (n.type === "document") {
-          ctx.strokeStyle = isDim ? "rgba(226,232,240,0.15)" : "rgba(226,232,240,0.5)";
-          ctx.lineWidth = 1;
-          ctx.stroke();
-        }
-
-        // Labels: always show for documents; show for high-weight entities or on hover/select/search
-        const isProminent = (n.weight ?? 1) >= 4;
-        const showLabel =
-          n.type === "document" ||
-          isHovered ||
-          isSelected ||
-          (q && n.label.includes(q)) ||
-          isProminent;
-        if (showLabel) {
-          const label = n.label.length > 24 ? n.label.slice(0, 22) + "…" : n.label;
-          ctx.font = n.type === "document" ? "bold 11px sans-serif" : "9px sans-serif";
-          ctx.fillStyle = isDim
-            ? "rgba(148,163,184,0.2)"
-            : n.type === "document"
-            ? "rgba(226,232,240,0.9)"
-            : "rgba(200,200,220,0.65)";
-          ctx.textAlign = "center";
-          ctx.fillText(label, n.x ?? 0, (n.y ?? 0) + r + 12);
-        }
+      // Label
+      const showLabel = isHovered || isSelected || !q || n.label.toLowerCase().includes(q);
+      if (showLabel) {
+        // Strip extension for cleaner display
+        const name = n.label.replace(/\.[^.]+$/, "");
+        const label = name.length > 26 ? name.slice(0, 24) + "…" : name;
+        ctx.font = isSelected ? "bold 11px sans-serif" : "10px sans-serif";
+        ctx.fillStyle = isDim ? LABEL_DIM : LABEL_COLOR;
+        ctx.textAlign = "center";
+        ctx.fillText(label, n.x ?? 0, (n.y ?? 0) + r + 13);
       }
+    }
 
-      ctx.restore();
-    },
-    [getVisibleNodeIds, search]
-  );
+    ctx.restore();
+  }, [search]);
 
-  // ── Animation loop ─────────────────────────────────────────────────────────
+  // ── Animation loop ────────────────────────────────────────────────────────
   useEffect(() => {
     if (loading || error || !canvasRef.current) return;
     const canvas = canvasRef.current;
@@ -424,7 +333,6 @@ export function KnowledgeGraph() {
       if (rect) {
         canvas.width = rect.width;
         canvas.height = rect.height;
-        // Re-center camera when resized
         transformRef.current = { x: 0, y: 0, scale: 1 };
       }
       initNodes(canvas);
@@ -444,87 +352,68 @@ export function KnowledgeGraph() {
     };
   }, [loading, error, tick, initNodes]);
 
-  // ── Hit test (accounts for camera transform) ──────────────────────────────
+  // ── Hit test ──────────────────────────────────────────────────────────────
   const getNodeAt = useCallback((mx: number, my: number): GraphNode | null => {
     const { x: tx, y: ty, scale } = transformRef.current;
     const cx = (mx - tx) / scale;
     const cy = (my - ty) / scale;
-    const visibleIds = getVisibleNodeIds();
     for (const n of nodesRef.current) {
-      if (!visibleIds.has(n.id)) continue;
-      const r = nodeRadius(n) + 5;
+      const r = nodeRadius(n.degree) + 6;
       const dx = (n.x ?? 0) - cx;
       const dy = (n.y ?? 0) - cy;
       if (dx * dx + dy * dy <= r * r) return n;
     }
     return null;
-  }, [getVisibleNodeIds]);
+  }, []);
 
-  // ── Mouse event handlers ──────────────────────────────────────────────────
-  const handleMouseMove = useCallback(
-    (e: React.MouseEvent<HTMLCanvasElement>) => {
-      const rect = canvasRef.current?.getBoundingClientRect();
-      if (!rect) return;
-      const mx = e.clientX - rect.left;
-      const my = e.clientY - rect.top;
+  // ── Mouse handlers ────────────────────────────────────────────────────────
+  const handleMouseMove = useCallback((e: React.MouseEvent<HTMLCanvasElement>) => {
+    const rect = canvasRef.current?.getBoundingClientRect();
+    if (!rect) return;
+    const mx = e.clientX - rect.left;
+    const my = e.clientY - rect.top;
 
-      if (isPanningRef.current) {
-        transformRef.current.x = panStartRef.current.tx + (mx - panStartRef.current.mx);
-        transformRef.current.y = panStartRef.current.ty + (my - panStartRef.current.my);
-        return;
-      }
+    if (isPanningRef.current) {
+      transformRef.current.x = panStartRef.current.tx + (mx - panStartRef.current.mx);
+      transformRef.current.y = panStartRef.current.ty + (my - panStartRef.current.my);
+      return;
+    }
 
-      const node = getNodeAt(mx, my);
-      hoveredRef.current = node?.id ?? null;
-      canvasRef.current!.style.cursor = node ? "pointer" : "grab";
-    },
-    [getNodeAt]
-  );
+    const node = getNodeAt(mx, my);
+    hoveredRef.current = node?.id ?? null;
+    canvasRef.current!.style.cursor = node ? "pointer" : "grab";
+  }, [getNodeAt]);
 
-  const handleMouseDown = useCallback(
-    (e: React.MouseEvent<HTMLCanvasElement>) => {
-      const rect = canvasRef.current?.getBoundingClientRect();
-      if (!rect) return;
-      const mx = e.clientX - rect.left;
-      const my = e.clientY - rect.top;
-      const node = getNodeAt(mx, my);
+  const handleMouseDown = useCallback((e: React.MouseEvent<HTMLCanvasElement>) => {
+    const rect = canvasRef.current?.getBoundingClientRect();
+    if (!rect) return;
+    const mx = e.clientX - rect.left;
+    const my = e.clientY - rect.top;
 
-      if (!node) {
-        // Start panning
-        isPanningRef.current = true;
-        panStartRef.current = {
-          mx,
-          my,
-          tx: transformRef.current.x,
-          ty: transformRef.current.y,
-        };
-        canvasRef.current!.style.cursor = "grabbing";
-      }
-    },
-    [getNodeAt]
-  );
+    if (!getNodeAt(mx, my)) {
+      isPanningRef.current = true;
+      panStartRef.current = { mx, my, tx: transformRef.current.x, ty: transformRef.current.y };
+      canvasRef.current!.style.cursor = "grabbing";
+    }
+  }, [getNodeAt]);
 
-  const handleMouseUp = useCallback(
-    (e: React.MouseEvent<HTMLCanvasElement>) => {
-      const rect = canvasRef.current?.getBoundingClientRect();
-      if (!rect) return;
-      const mx = e.clientX - rect.left;
-      const my = e.clientY - rect.top;
+  const handleMouseUp = useCallback((e: React.MouseEvent<HTMLCanvasElement>) => {
+    const rect = canvasRef.current?.getBoundingClientRect();
+    if (!rect) return;
+    const mx = e.clientX - rect.left;
+    const my = e.clientY - rect.top;
 
-      if (isPanningRef.current) {
-        isPanningRef.current = false;
-        canvasRef.current!.style.cursor = "grab";
-        return;
-      }
+    if (isPanningRef.current) {
+      isPanningRef.current = false;
+      canvasRef.current!.style.cursor = "grab";
+      return;
+    }
 
-      // Click: select node
-      const node = getNodeAt(mx, my);
-      const newSelected = node?.id === selectedRef.current ? null : node?.id ?? null;
-      selectedRef.current = newSelected;
-      setSelectedNode(newSelected ? (node ?? null) : null);
-    },
-    [getNodeAt]
-  );
+    const node = getNodeAt(mx, my);
+    const next = node?.id === selectedRef.current ? null : node?.id ?? null;
+    selectedRef.current = next;
+    setSelectedNode(next ? (node ?? null) : null);
+  }, [getNodeAt]);
 
   const handleWheel = useCallback((e: React.WheelEvent<HTMLCanvasElement>) => {
     e.preventDefault();
@@ -532,12 +421,9 @@ export function KnowledgeGraph() {
     if (!rect) return;
     const mx = e.clientX - rect.left;
     const my = e.clientY - rect.top;
-
-    const factor = e.deltaY < 0 ? 1.1 : 0.9;
+    const factor = e.deltaY < 0 ? 1.12 : 0.9;
     const { x: tx, y: ty, scale } = transformRef.current;
-    const newScale = Math.max(0.2, Math.min(5, scale * factor));
-
-    // Zoom towards cursor
+    const newScale = Math.max(0.15, Math.min(6, scale * factor));
     transformRef.current = {
       x: mx - (mx - tx) * (newScale / scale),
       y: my - (my - ty) * (newScale / scale),
@@ -545,23 +431,11 @@ export function KnowledgeGraph() {
     };
   }, []);
 
-  const toggleFilter = useCallback((type: EntityType) => {
-    setActiveFilters((prev) => {
-      const next = new Set(prev);
-      if (next.has(type)) {
-        if (next.size > 1) next.delete(type); // keep at least one filter active
-      } else {
-        next.add(type);
-      }
-      return next;
-    });
-  }, []);
-
-  // ── Empty / loading states ────────────────────────────────────────────────
+  // ── States ────────────────────────────────────────────────────────────────
   if (loading) {
     return (
       <div className="flex h-full items-center justify-center">
-        <p className="text-xs text-muted-foreground/50 animate-pulse">Loading graph…</p>
+        <p className="text-xs text-muted-foreground/40 animate-pulse">Loading graph…</p>
       </div>
     );
   }
@@ -572,23 +446,54 @@ export function KnowledgeGraph() {
       </div>
     );
   }
-  if (dataRef.current.nodes.length === 0) {
+  if (docCount === 0) {
     return (
-      <div className="flex h-full flex-col items-center justify-center gap-2">
-        <svg className="h-10 w-10 text-muted-foreground/20" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1}>
-          <circle cx="6" cy="12" r="2" /><circle cx="18" cy="6" r="2" /><circle cx="18" cy="18" r="2" />
-          <line x1="8" y1="12" x2="16" y2="7" /><line x1="8" y1="12" x2="16" y2="17" />
+      <div className="flex h-full flex-col items-center justify-center gap-3">
+        <svg className="h-12 w-12 text-muted-foreground/15" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={0.8}>
+          <circle cx="5" cy="12" r="2.5" />
+          <circle cx="19" cy="5" r="2.5" />
+          <circle cx="19" cy="19" r="2.5" />
+          <line x1="7.5" y1="11" x2="16.5" y2="6.5" />
+          <line x1="7.5" y1="13" x2="16.5" y2="17.5" />
         </svg>
-        <p className="text-xs text-muted-foreground/40">
-          Upload documents to see the knowledge graph
+        <p className="text-xs text-muted-foreground/35 text-center max-w-[180px]">
+          Upload documents to see how they connect
         </p>
+      </div>
+    );
+  }
+  if (docCount === 1) {
+    return (
+      <div className="relative h-full w-full bg-[#0a0a0f]" style={{ borderRadius: "inherit" }}>
+        <canvas
+          ref={canvasRef}
+          className="h-full w-full"
+          style={{ cursor: "grab" }}
+          onMouseMove={handleMouseMove}
+          onMouseDown={handleMouseDown}
+          onMouseUp={handleMouseUp}
+          onMouseLeave={() => { hoveredRef.current = null; isPanningRef.current = false; }}
+          onWheel={handleWheel}
+        />
+        <div className="absolute bottom-3 left-0 right-0 flex justify-center pointer-events-none">
+          <p className="text-[10px] text-slate-700 bg-black/40 px-3 py-1 rounded-full backdrop-blur-sm">
+            Upload more documents to see connections
+          </p>
+        </div>
+        {selectedNode && (
+          <DetailPanel
+            node={selectedNode}
+            edges={dataRef.current.edges}
+            allNodes={nodesRef.current}
+            onClose={() => { selectedRef.current = null; setSelectedNode(null); }}
+          />
+        )}
       </div>
     );
   }
 
   return (
     <div className="relative h-full w-full bg-[#0a0a0f]" style={{ borderRadius: "inherit" }}>
-      {/* Canvas */}
       <canvas
         ref={canvasRef}
         className="h-full w-full"
@@ -596,60 +501,32 @@ export function KnowledgeGraph() {
         onMouseMove={handleMouseMove}
         onMouseDown={handleMouseDown}
         onMouseUp={handleMouseUp}
-        onMouseLeave={() => {
-          hoveredRef.current = null;
-          isPanningRef.current = false;
-        }}
+        onMouseLeave={() => { hoveredRef.current = null; isPanningRef.current = false; }}
         onWheel={handleWheel}
       />
 
-      {/* Top-left: search */}
-      <div className="absolute top-3 left-3 flex flex-col gap-1.5">
+      {/* Search */}
+      <div className="absolute top-3 left-3">
         <input
           type="text"
-          placeholder="Search…"
+          placeholder="Search documents…"
           value={search}
           onChange={(e) => setSearch(e.target.value)}
-          className="w-32 rounded-md border border-white/10 bg-black/50 px-2 py-1 text-[10px] text-slate-300 placeholder:text-slate-600 focus:outline-none focus:border-white/25 backdrop-blur-sm"
+          className="w-36 rounded-md border border-white/10 bg-black/50 px-2 py-1 text-[10px] text-slate-300 placeholder:text-slate-600 focus:outline-none focus:border-white/20 backdrop-blur-sm"
         />
-        <span className="text-[9px] text-slate-700">
-          {stats.nodes} nodes · {stats.edges} links
-        </span>
       </div>
 
-      {/* Bottom-left: entity type filters */}
-      <div className="absolute bottom-3 left-3 flex flex-col gap-1.5">
-        <p className="text-[8px] uppercase tracking-widest text-slate-600 mb-0.5">Filter</p>
-        {ENTITY_TYPES.map((type) => (
-          <button
-            key={type}
-            onClick={() => toggleFilter(type)}
-            className={`flex items-center gap-1.5 transition-opacity ${
-              activeFilters.has(type) ? "opacity-100" : "opacity-35"
-            }`}
-          >
-            <div
-              className="h-2 w-2 rounded-full shrink-0"
-              style={{
-                backgroundColor: activeFilters.has(type)
-                  ? ENTITY_TYPE_COLORS[type]
-                  : "#4b5563",
-              }}
-            />
-            <span className="text-[9px] text-slate-500">{TYPE_LABELS[type]}</span>
-          </button>
-        ))}
-        {/* Document marker */}
-        <div className="flex items-center gap-1.5 mt-0.5 border-t border-white/5 pt-1.5">
-          <div className="h-2 w-2 rounded-full shrink-0" style={{ backgroundColor: ENTITY_TYPE_COLORS.document }} />
-          <span className="text-[9px] text-slate-500">Document</span>
-        </div>
+      {/* Doc count */}
+      <div className="absolute top-3 right-3">
+        {!selectedNode && (
+          <span className="text-[9px] text-slate-700">{docCount} documents</span>
+        )}
       </div>
 
-      {/* Bottom-right: controls hint */}
-      <div className="absolute bottom-3 right-3 flex flex-col items-end gap-1">
-        <p className="text-[9px] text-slate-700">scroll to zoom · drag to pan</p>
-        <p className="text-[9px] text-slate-700">click node for details</p>
+      {/* Hints */}
+      <div className="absolute bottom-3 right-3 flex flex-col items-end gap-0.5 pointer-events-none">
+        <p className="text-[9px] text-slate-800">scroll to zoom · drag to pan</p>
+        <p className="text-[9px] text-slate-800">click document for links</p>
       </div>
 
       {/* Detail panel */}
@@ -657,11 +534,8 @@ export function KnowledgeGraph() {
         <DetailPanel
           node={selectedNode}
           edges={dataRef.current.edges}
-          allNodes={dataRef.current.nodes}
-          onClose={() => {
-            selectedRef.current = null;
-            setSelectedNode(null);
-          }}
+          allNodes={nodesRef.current}
+          onClose={() => { selectedRef.current = null; setSelectedNode(null); }}
         />
       )}
     </div>

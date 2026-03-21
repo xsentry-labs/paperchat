@@ -1,17 +1,13 @@
 /**
  * Knowledge graph operations — stored relationally in PostgreSQL.
  *
- * Graph model:
- *   Nodes:  Document | Chunk | Entity
- *   Edges:  CHUNK → DOCUMENT   (via chunks.document_id FK — already exists)
- *           CHUNK → ENTITY     (via chunk_entities junction table)
- *           ENTITY → ENTITY    (not implemented — add later if needed)
+ * Visualization model (Obsidian-style):
+ *   Nodes  = Documents
+ *   Edges  = Two documents share ≥1 entity (weighted by shared entity count)
  *
- * All graph operations use the admin client (service role) because they
- * run server-side during ingestion or retrieval, bypassing RLS.
- *
- * For the frontend visualization we expose a separate /api/graph endpoint
- * that aggregates Document → Entity edges (collapsing chunks for clarity).
+ * Entity extraction still happens per-chunk during ingestion — entities are the
+ * mechanism for finding document relationships, but they don't appear as nodes
+ * in the frontend graph.
  */
 
 import { createAdminClient } from "@/lib/supabase/admin";
@@ -28,24 +24,23 @@ export interface GraphEntity {
 
 export interface GraphNode {
   id: string;
-  type: "document" | "entity";
+  type: "document";
   label: string;
-  entityType?: string; // only for entity nodes
-  documentId?: string; // only for entity nodes (which doc they appear in)
-  weight?: number;     // chunk frequency — used to scale node radius in the visualizer
+  degree?: number; // number of other documents this doc links to
 }
 
 export interface GraphEdge {
   source: string;
   target: string;
-  type: "mentions"; // doc → entity edge (aggregated from chunk_entities)
+  weight: number; // number of shared entities between the two documents
+  sharedEntities: string[]; // entity names, used in detail panel
 }
 
 // ── Write operations ───────────────────────────────────────────────────────
 
 /**
  * Persist extracted entities for a chunk.
- * Upsets entities (dedup by user_id+name) then creates chunk→entity edges.
+ * Upserts entities (dedup by user_id+name) then creates chunk→entity edges.
  */
 export async function storeChunkEntities(
   chunkId: string,
@@ -56,7 +51,6 @@ export async function storeChunkEntities(
   const admin = createAdminClient();
 
   for (const entity of entities) {
-    // Upsert the entity node — dedup by (user_id, name)
     const { data: entityRow, error: upsertErr } = await admin
       .from("entities")
       .upsert(
@@ -71,7 +65,6 @@ export async function storeChunkEntities(
       continue;
     }
 
-    // Create the CHUNK → ENTITY edge
     const { error: edgeErr } = await admin
       .from("chunk_entities")
       .upsert({ chunk_id: chunkId, entity_id: entityRow.id });
@@ -100,10 +93,8 @@ export async function getChunkEntities(
 
   if (error || !data) return [];
 
-  // Group by entity
   const map = new Map<string, GraphEntity>();
   for (const row of data) {
-    // Supabase may return joined records as object or single-element array
     const eRaw = row.entities as unknown;
     const e = Array.isArray(eRaw)
       ? (eRaw[0] as { id: string; name: string; type: string } | undefined)
@@ -144,9 +135,10 @@ export async function expandByEntities(
 }
 
 /**
- * Build graph data for the frontend visualizer.
- * Returns Document nodes + Entity nodes + Document→Entity edges.
- * Chunks are collapsed for visual clarity.
+ * Build the Obsidian-style graph for the frontend:
+ *   - One node per document
+ *   - One edge per document pair that shares ≥1 entity
+ *   - Edge weight = number of shared entities
  */
 export async function buildGraphForUser(userId: string): Promise<{
   nodes: GraphNode[];
@@ -154,16 +146,16 @@ export async function buildGraphForUser(userId: string): Promise<{
 }> {
   const admin = createAdminClient();
 
-  // Get all ready documents for the user
+  // 1. Fetch all ready documents
   const { data: docs } = await admin
     .from("documents")
-    .select("id, filename, status")
+    .select("id, filename")
     .eq("user_id", userId)
     .eq("status", "ready");
 
   if (!docs || docs.length === 0) return { nodes: [], edges: [] };
 
-  // Get all chunks for those documents
+  // 2. Fetch all chunks for those documents
   const docIds = docs.map((d) => d.id);
   const { data: chunks } = await admin
     .from("chunks")
@@ -171,79 +163,75 @@ export async function buildGraphForUser(userId: string): Promise<{
     .in("document_id", docIds);
 
   if (!chunks || chunks.length === 0) {
-    // Return just document nodes with no edges
     return {
-      nodes: docs.map((d) => ({ id: d.id, type: "document", label: d.filename })),
+      nodes: docs.map((d) => ({ id: d.id, type: "document", label: d.filename, degree: 0 })),
       edges: [],
     };
   }
 
-  const chunkIds = chunks.map((c) => c.id);
   const chunkToDoc = new Map(chunks.map((c) => [c.id, c.document_id]));
+  const chunkIds = chunks.map((c) => c.id);
 
-  // Get chunk→entity edges
+  // 3. Fetch chunk→entity links
   const { data: ceRows } = await admin
     .from("chunk_entities")
-    .select("chunk_id, entities(id, name, type)")
+    .select("chunk_id, entities(id, name)")
     .in("chunk_id", chunkIds);
 
-  // Count how many chunks reference each entity, and track doc→entity edges
-  const entityMeta = new Map<
-    string,
-    { node: GraphNode; chunkCount: number; docIds: Set<string> }
-  >();
+  // 4. Build: entityId → Set of document IDs that mention it
+  const entityToDocs = new Map<string, { name: string; docIds: Set<string> }>();
 
   for (const row of ceRows ?? []) {
     const eRaw = row.entities as unknown;
     const e = Array.isArray(eRaw)
-      ? (eRaw[0] as { id: string; name: string; type: string } | undefined)
-      : (eRaw as { id: string; name: string; type: string } | null);
+      ? (eRaw[0] as { id: string; name: string } | undefined)
+      : (eRaw as { id: string; name: string } | null);
     if (!e) continue;
 
-    if (!entityMeta.has(e.id)) {
-      entityMeta.set(e.id, {
-        node: { id: e.id, type: "entity", label: e.name, entityType: e.type },
-        chunkCount: 0,
-        docIds: new Set(),
-      });
-    }
-    const meta = entityMeta.get(e.id)!;
-    meta.chunkCount += 1;
-
     const docId = chunkToDoc.get(row.chunk_id);
-    if (docId) meta.docIds.add(docId);
+    if (!docId) continue;
+
+    if (!entityToDocs.has(e.id)) {
+      entityToDocs.set(e.id, { name: e.name, docIds: new Set() });
+    }
+    entityToDocs.get(e.id)!.docIds.add(docId);
   }
 
-  // Keep only significant entities:
-  // — appear in ≥2 chunks (avoids one-time noise)
-  // — OR if a doc has very few chunks, keep top-referenced ones
-  // — then cap at 50 by chunk frequency so the graph stays readable
-  const minChunks = chunks.length <= 5 ? 1 : 2;
-  const significant = Array.from(entityMeta.values())
-    .filter((m) => m.chunkCount >= minChunks)
-    .sort((a, b) => b.chunkCount - a.chunkCount)
-    .slice(0, 50);
+  // 5. Build document-pair edges: count shared entities
+  const pairShared = new Map<string, { count: number; names: string[] }>();
 
-  const edges: GraphEdge[] = [];
-  const edgeSet = new Set<string>();
-
-  for (const { node, docIds } of significant) {
-    for (const docId of docIds) {
-      const key = `${docId}:${node.id}`;
-      if (!edgeSet.has(key)) {
-        edgeSet.add(key);
-        edges.push({ source: docId, target: node.id, type: "mentions" });
+  for (const { name, docIds } of entityToDocs.values()) {
+    if (docIds.size < 2) continue; // entity only in one doc → no link
+    const arr = Array.from(docIds).sort();
+    for (let i = 0; i < arr.length; i++) {
+      for (let j = i + 1; j < arr.length; j++) {
+        const key = `${arr[i]}|${arr[j]}`;
+        if (!pairShared.has(key)) pairShared.set(key, { count: 0, names: [] });
+        const entry = pairShared.get(key)!;
+        entry.count += 1;
+        if (entry.names.length < 10) entry.names.push(name);
       }
     }
   }
 
-  const nodes: GraphNode[] = [
-    ...docs.map((d) => ({ id: d.id, type: "document" as const, label: d.filename })),
-    ...significant.map((m) => ({
-      ...m.node,
-      weight: m.chunkCount, // used by frontend to scale node size
-    })),
-  ];
+  const edges: GraphEdge[] = Array.from(pairShared.entries()).map(([key, val]) => {
+    const [source, target] = key.split("|");
+    return { source, target, weight: val.count, sharedEntities: val.names };
+  });
+
+  // 6. Compute degree per document node
+  const degreeMap = new Map<string, number>();
+  for (const e of edges) {
+    degreeMap.set(e.source, (degreeMap.get(e.source) ?? 0) + 1);
+    degreeMap.set(e.target, (degreeMap.get(e.target) ?? 0) + 1);
+  }
+
+  const nodes: GraphNode[] = docs.map((d) => ({
+    id: d.id,
+    type: "document",
+    label: d.filename,
+    degree: degreeMap.get(d.id) ?? 0,
+  }));
 
   return { nodes, edges };
 }
