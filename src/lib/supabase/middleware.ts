@@ -37,8 +37,12 @@ export async function updateSession(request: NextRequest) {
 
   const isAnonymous = (user as { is_anonymous?: boolean } | null)?.is_anonymous ?? false;
 
+  // API routes are proxied to the FastAPI backend which handles its own auth.
+  // Don't redirect them — a redirect response breaks fetch() calls from the client.
+  const isApiRoute = request.nextUrl.pathname.startsWith("/api/");
+
   // Unauthenticated users can only access auth routes
-  if (!user && !isAuthRoute && !request.nextUrl.pathname.startsWith("/auth")) {
+  if (!user && !isAuthRoute && !isApiRoute && !request.nextUrl.pathname.startsWith("/auth")) {
     const url = request.nextUrl.clone();
     url.pathname = "/login";
     return NextResponse.redirect(url);
