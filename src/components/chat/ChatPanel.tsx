@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useChat } from "@ai-sdk/react";
 import { DefaultChatTransport } from "ai";
 import type { ChatMessage } from "@/lib/types";
@@ -104,6 +104,7 @@ export function ChatPanel({ conversationId, initialQuestion }: ChatPanelProps) {
   const [currentModel, setCurrentModel] = useState<string>(DEFAULT_MODEL_ID);
   const [chatError, setChatError] = useState<string | null>(null);
   const [rateLimitRemaining, setRateLimitRemaining] = useState<number | null>(null);
+  const [activeToolName, setActiveToolName] = useState<string | null>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
@@ -131,11 +132,59 @@ export function ChatPanel({ conversationId, initialQuestion }: ChatPanelProps) {
     load();
   }, [conversationId]);
 
-  const { messages, sendMessage, status, data: streamData } = useChat({
+  const TOOL_LABELS: Record<string, string> = {
+    vector_search: "Searching documents",
+    knowledge_graph: "Exploring knowledge graph",
+    read_document: "Reading document",
+    web_search: "Searching the web",
+    web_fetch: "Fetching page",
+    python_exec: "Running analysis",
+    plot_chart: "Generating chart",
+    sql_query: "Querying data",
+    spawn_subagent: "Delegating to subagent",
+  };
+
+  // Intercept the SSE stream to extract tool_event chunks (2: format) for progress display.
+  // In AI SDK v6, `data` was removed from useChat; we tee the response stream instead.
+  const trackingFetch = useCallback(async (input: RequestInfo | URL, init?: RequestInit): Promise<Response> => {
+    const response = await authFetch(input, init as RequestInit);
+    if (!response.body) return response;
+    const [stream1, stream2] = response.body.tee();
+    const reader = stream1.getReader();
+    const decoder = new TextDecoder();
+    (async () => {
+      try {
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
+          const text = decoder.decode(value, { stream: true });
+          for (const line of text.split("\n")) {
+            if (line.startsWith("2:")) {
+              try {
+                const items = JSON.parse(line.slice(2)) as Array<{ type?: string; name?: string; status?: string }>;
+                for (const item of items) {
+                  if (item?.type === "tool_event") {
+                    setActiveToolName(item.status === "start" ? (item.name ?? null) : null);
+                  }
+                }
+              } catch { /* ignore parse errors */ }
+            } else if (line.startsWith("d:")) {
+              setActiveToolName(null);
+            }
+          }
+        }
+      } catch { /* ignore stream errors */ } finally {
+        reader.releaseLock();
+      }
+    })();
+    return new Response(stream2, { status: response.status, statusText: response.statusText, headers: response.headers });
+  }, []);
+
+  const { messages, sendMessage, status } = useChat({
     transport: new DefaultChatTransport({
       api: "/api/query",
       body: { conversationId },
-      fetch: authFetch,
+      fetch: trackingFetch,
     }),
     onError(err) {
       if (err.message?.includes("daily_limit_reached")) {
@@ -147,6 +196,7 @@ export function ChatPanel({ conversationId, initialQuestion }: ChatPanelProps) {
     },
     onFinish() {
       setChatError(null);
+      setActiveToolName(null);
       window.dispatchEvent(new Event("conversation-updated"));
       // Refresh rate limit count only (no history refetch - avoids blink)
       authFetch("/api/rate-limit")
@@ -156,32 +206,7 @@ export function ChatPanel({ conversationId, initialQuestion }: ChatPanelProps) {
   });
 
   const isLoading = status === "submitted" || status === "streaming";
-
-  // Derive active tool from streaming data events (2: SSE format)
-  const activeToolLabel = (() => {
-    if (!isLoading || !streamData?.length) return null;
-    const TOOL_LABELS: Record<string, string> = {
-      vector_search: "Searching documents",
-      knowledge_graph: "Exploring knowledge graph",
-      read_document: "Reading document",
-      web_search: "Searching the web",
-      web_fetch: "Fetching page",
-      python_exec: "Running analysis",
-      plot_chart: "Generating chart",
-      sql_query: "Querying data",
-      spawn_subagent: "Delegating to subagent",
-    };
-    // Walk events from the end to find the latest "start" without a matching "done"
-    const events = streamData as Array<{ type?: string; name?: string; status?: string }>;
-    for (let i = events.length - 1; i >= 0; i--) {
-      const e = events[i];
-      if (e?.type === "tool_event" && e.status === "start") {
-        return TOOL_LABELS[e.name ?? ""] ?? e.name ?? null;
-      }
-      if (e?.type === "tool_event" && e.status === "done") break;
-    }
-    return null;
-  })();
+  const activeToolLabel = isLoading && activeToolName ? (TOOL_LABELS[activeToolName] ?? activeToolName) : null;
   const initialSent = useRef(false);
 
   // Auto-send initial question from home page redirect
