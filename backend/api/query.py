@@ -7,7 +7,8 @@ import asyncio
 import json
 import re
 import time
-from typing import AsyncGenerator
+from dataclasses import dataclass
+from typing import AsyncGenerator, Union
 
 from fastapi import APIRouter, Depends, HTTPException
 from fastapi.responses import StreamingResponse
@@ -22,6 +23,23 @@ from agent.loop import run_agent, build_tool_registry
 from agent.context import SYSTEM_PROMPT, build_messages
 
 router = APIRouter()
+
+
+# ---------------------------------------------------------------------------
+# Typed queue items for the streaming pipeline
+# ---------------------------------------------------------------------------
+
+@dataclass
+class _TokenItem:
+    token: str
+
+@dataclass
+class _ToolEventItem:
+    name: str
+    status: str          # "start" | "done"
+    duration_ms: int | None = None
+
+_QueueItem = Union[_TokenItem, _ToolEventItem, None]  # None = sentinel / end
 
 
 class MessagePart(BaseModel):
@@ -51,6 +69,14 @@ def _extract_text(msg: ChatMessage) -> str:
 def _sse_text(token: str) -> str:
     """Vercel AI SDK text chunk format."""
     return f'0:{json.dumps(token)}\n'
+
+
+def _sse_tool_event(name: str, status: str, duration_ms: int | None = None) -> str:
+    """Vercel AI SDK data chunk (2:) — carries tool progress events."""
+    payload: dict = {"type": "tool_event", "name": name, "status": status}
+    if duration_ms is not None:
+        payload["duration_ms"] = duration_ms
+    return f'2:{json.dumps([payload])}\n'
 
 
 def _sse_metadata(sources: list) -> str:
@@ -125,12 +151,17 @@ async def _stream_response(
     collected_tokens: list[str] = []
     start_time = time.monotonic()
 
+    event_queue: asyncio.Queue[_QueueItem] = asyncio.Queue()
+
     async def on_token(token: str) -> None:
         collected_tokens.append(token)
-        # We'll yield from the generator via queue
-        token_queue.put_nowait(token)
+        event_queue.put_nowait(_TokenItem(token))
 
-    token_queue: asyncio.Queue[str | None] = asyncio.Queue()
+    async def on_tool_start(name: str, arguments: dict) -> None:
+        event_queue.put_nowait(_ToolEventItem(name=name, status="start"))
+
+    async def on_tool_end(name: str, duration_ms: int) -> None:
+        event_queue.put_nowait(_ToolEventItem(name=name, status="done", duration_ms=duration_ms))
 
     # Build initial messages
     initial_messages = build_messages(
@@ -142,14 +173,17 @@ async def _stream_response(
     # Save user message before streaming starts
     await _save_message(conv["id"], "user", question)
 
-    # Run agent in background, stream tokens via queue
+    # Run agent in background, stream events via queue
     agent_task = asyncio.create_task(
-        _run_agent_task(initial_messages, tools, model, on_token, token_queue)
+        _run_agent_task(initial_messages, tools, model, on_token, on_tool_start, on_tool_end, event_queue)
     )
 
-    # Stream tokens as they arrive
-    async for token in _drain_queue(token_queue, agent_task):
-        yield _sse_text(token)
+    # Stream events as they arrive
+    async for item in _drain_queue(event_queue, agent_task):
+        if isinstance(item, _TokenItem):
+            yield _sse_text(item.token)
+        elif isinstance(item, _ToolEventItem):
+            yield _sse_tool_event(item.name, item.status, item.duration_ms)
 
     # Get agent result
     agent_result = agent_task.result() if not agent_task.exception() else None
@@ -189,7 +223,7 @@ async def _stream_response(
     await write_agent_log(entry)
 
 
-async def _run_agent_task(initial_messages, tools, model, on_token, token_queue):
+async def _run_agent_task(initial_messages, tools, model, on_token, on_tool_start, on_tool_end, event_queue):
     from agent.loop import run_agent, AgentResult
     try:
         result = await run_agent(
@@ -197,16 +231,18 @@ async def _run_agent_task(initial_messages, tools, model, on_token, token_queue)
             tools=tools,
             model=model,
             on_token=on_token,
+            on_tool_start=on_tool_start,
+            on_tool_end=on_tool_end,
         )
         return result
     finally:
-        await token_queue.put(None)  # Signal completion
+        await event_queue.put(None)  # Signal completion
 
 
 async def _drain_queue(
-    queue: asyncio.Queue[str | None],
+    queue: asyncio.Queue[_QueueItem],
     task: asyncio.Task,
-) -> AsyncGenerator[str, None]:
+) -> AsyncGenerator[_QueueItem, None]:
     while True:
         try:
             item = await asyncio.wait_for(queue.get(), timeout=30.0)

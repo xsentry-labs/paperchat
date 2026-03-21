@@ -24,6 +24,8 @@ async def run_agent(
     tools: ToolRegistry,
     model: str,
     on_token: Callable[[str], Awaitable[None]] | None = None,
+    on_tool_start: Callable[[str, dict], Awaitable[None]] | None = None,
+    on_tool_end: Callable[[str, int], Awaitable[None]] | None = None,
     max_iterations: int | None = None,
 ) -> AgentResult:
     if max_iterations is None:
@@ -55,9 +57,15 @@ async def run_agent(
             messages.append(response.to_message())
 
             for tool_call in response.tool_calls:
+                if on_tool_start:
+                    await on_tool_start(tool_call.name, tool_call.arguments)
+
                 t_tool = time.monotonic()
                 result = await tools.execute(tool_call.name, tool_call.arguments)
                 tool_duration = int((time.monotonic() - t_tool) * 1000)
+
+                if on_tool_end:
+                    await on_tool_end(tool_call.name, tool_duration)
 
                 messages.append({
                     "role": "tool",

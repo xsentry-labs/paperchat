@@ -4,6 +4,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from core.config import settings
 from api import (
+    auth_routes,
     documents,
     conversations,
     messages,
@@ -41,6 +42,7 @@ app.add_middleware(
 )
 
 # Register all routers
+app.include_router(auth_routes.router)
 app.include_router(documents.router)
 app.include_router(conversations.router)
 app.include_router(messages.router)

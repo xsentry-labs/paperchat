@@ -5,6 +5,7 @@ import { useChat } from "@ai-sdk/react";
 import { DefaultChatTransport } from "ai";
 import type { ChatMessage } from "@/lib/types";
 import { DEFAULT_MODEL_ID } from "@/lib/models";
+import { authFetch } from "@/lib/auth-fetch";
 import { CitationCard } from "./CitationCard";
 import { MarkdownContent } from "./MarkdownContent";
 import { ModelSelector } from "./ModelSelector";
@@ -110,9 +111,9 @@ export function ChatPanel({ conversationId, initialQuestion }: ChatPanelProps) {
     setHistoryLoading(true);
     async function load() {
       const [msgRes, profileRes, rateLimitRes] = await Promise.all([
-        fetch(`/api/conversations/${conversationId}/messages`),
-        fetch("/api/profile"),
-        fetch("/api/rate-limit"),
+        authFetch(`/api/conversations/${conversationId}/messages`),
+        authFetch("/api/profile"),
+        authFetch("/api/rate-limit"),
       ]);
       if (msgRes.ok) {
         const data = await msgRes.json();
@@ -130,8 +131,12 @@ export function ChatPanel({ conversationId, initialQuestion }: ChatPanelProps) {
     load();
   }, [conversationId]);
 
-  const { messages, sendMessage, status } = useChat({
-    transport: new DefaultChatTransport({ api: "/api/query", body: { conversationId } }),
+  const { messages, sendMessage, status, data: streamData } = useChat({
+    transport: new DefaultChatTransport({
+      api: "/api/query",
+      body: { conversationId },
+      fetch: authFetch,
+    }),
     onError(err) {
       if (err.message?.includes("daily_limit_reached")) {
         setChatError("Daily limit reached. Resets at midnight.");
@@ -144,13 +149,39 @@ export function ChatPanel({ conversationId, initialQuestion }: ChatPanelProps) {
       setChatError(null);
       window.dispatchEvent(new Event("conversation-updated"));
       // Refresh rate limit count only (no history refetch - avoids blink)
-      fetch("/api/rate-limit")
+      authFetch("/api/rate-limit")
         .then((r) => r.json())
         .then((data) => setRateLimitRemaining(data.remaining ?? null));
     },
   });
 
   const isLoading = status === "submitted" || status === "streaming";
+
+  // Derive active tool from streaming data events (2: SSE format)
+  const activeToolLabel = (() => {
+    if (!isLoading || !streamData?.length) return null;
+    const TOOL_LABELS: Record<string, string> = {
+      vector_search: "Searching documents",
+      knowledge_graph: "Exploring knowledge graph",
+      read_document: "Reading document",
+      web_search: "Searching the web",
+      web_fetch: "Fetching page",
+      python_exec: "Running analysis",
+      plot_chart: "Generating chart",
+      sql_query: "Querying data",
+      spawn_subagent: "Delegating to subagent",
+    };
+    // Walk events from the end to find the latest "start" without a matching "done"
+    const events = streamData as Array<{ type?: string; name?: string; status?: string }>;
+    for (let i = events.length - 1; i >= 0; i--) {
+      const e = events[i];
+      if (e?.type === "tool_event" && e.status === "start") {
+        return TOOL_LABELS[e.name ?? ""] ?? e.name ?? null;
+      }
+      if (e?.type === "tool_event" && e.status === "done") break;
+    }
+    return null;
+  })();
   const initialSent = useRef(false);
 
   // Auto-send initial question from home page redirect
@@ -209,7 +240,7 @@ export function ChatPanel({ conversationId, initialQuestion }: ChatPanelProps) {
 
   async function handleModelChange(model: string) {
     setCurrentModel(model);
-    fetch("/api/profile", { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ preferred_model: model }) });
+    authFetch("/api/profile", { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ preferred_model: model }) });
   }
 
   return (
@@ -284,11 +315,20 @@ export function ChatPanel({ conversationId, initialQuestion }: ChatPanelProps) {
 
           {status === "submitted" && (
             <div className="animate-fade-in">
-              <div className="flex gap-1 py-2">
-                <span className="h-1.5 w-1.5 rounded-full bg-muted-foreground/30 animate-bounce" />
-                <span className="h-1.5 w-1.5 rounded-full bg-muted-foreground/30 animate-bounce [animation-delay:0.15s]" />
-                <span className="h-1.5 w-1.5 rounded-full bg-muted-foreground/30 animate-bounce [animation-delay:0.3s]" />
-              </div>
+              {activeToolLabel ? (
+                <div className="flex items-center gap-2 py-2">
+                  <span className="h-1.5 w-1.5 rounded-full bg-muted-foreground/30 animate-bounce" />
+                  <span className="h-1.5 w-1.5 rounded-full bg-muted-foreground/30 animate-bounce [animation-delay:0.15s]" />
+                  <span className="h-1.5 w-1.5 rounded-full bg-muted-foreground/30 animate-bounce [animation-delay:0.3s]" />
+                  <span className="text-[11px] text-muted-foreground/50 ml-1">{activeToolLabel}…</span>
+                </div>
+              ) : (
+                <div className="flex gap-1 py-2">
+                  <span className="h-1.5 w-1.5 rounded-full bg-muted-foreground/30 animate-bounce" />
+                  <span className="h-1.5 w-1.5 rounded-full bg-muted-foreground/30 animate-bounce [animation-delay:0.15s]" />
+                  <span className="h-1.5 w-1.5 rounded-full bg-muted-foreground/30 animate-bounce [animation-delay:0.3s]" />
+                </div>
+              )}
             </div>
           )}
 

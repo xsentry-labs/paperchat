@@ -363,9 +363,12 @@ Minimal — just point API calls at the FastAPI server:
 - **Hybrid NER**: Add LLM-based entity extraction as an agent tool alongside spaCy (user requested)
 - **Async ingestion**: Background job queue (Celery/ARQ/Supabase Edge Functions) so uploads return instantly instead of blocking the request
 - **MCP support**: Add Model Context Protocol for external tool integration
-- **Streaming tool progress**: Stream intermediate tool results to the client during agent execution
-- **Authentication hardening**: Refresh token handling, session management
 - **Scanned PDF support**: Re-add OCR via a cloud API (e.g. OpenAI vision, Google Vision) instead of the Tesseract system binary — compatible with Vercel serverless
+
+## Completed (Post-MVP)
+
+- **Streaming tool progress** ✅: `on_tool_start`/`on_tool_end` callbacks added to the agent loop; tool events emitted as Vercel AI SDK `2:` data SSE chunks; `ChatPanel` shows the active tool name (e.g. "Searching documents…") inline with the loading indicator during agent execution.
+- **Authentication hardening** ✅: Backend `get_current_user` now detects expired JWTs specifically (decodes `exp` without verification) and returns `detail="token_expired"` with a `WWW-Authenticate` header. New `POST /api/auth/refresh` endpoint exchanges a Supabase refresh token for a fresh session. Frontend `authFetch` wrapper auto-attaches `Authorization: Bearer` headers, detects `token_expired` 401s, calls the refresh endpoint, and retries the original request transparently.
 
 ---
 
