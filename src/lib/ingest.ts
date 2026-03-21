@@ -1,6 +1,9 @@
 import { createAdminClient } from "@/lib/supabase/admin";
 import { chunkText } from "@/lib/chunker";
 import { embedBatch } from "@/lib/embeddings";
+import { extractEntities } from "@/lib/entities";
+import { storeChunkEntities } from "@/lib/graph";
+import { encrypt, deriveUserKey } from "@/lib/encryption";
 import OpenAI from "openai";
 
 const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
@@ -14,7 +17,7 @@ export async function ingestDocument(documentId: string) {
     .update({ status: "processing", updated_at: new Date().toISOString() })
     .eq("id", documentId);
 
-  // Fetch document metadata
+  // Fetch document metadata (includes user_id for per-user encryption key)
   const { data: doc, error: docError } = await admin
     .from("documents")
     .select("*")
@@ -44,26 +47,56 @@ export async function ingestDocument(documentId: string) {
     throw new Error("No content could be extracted from document");
   }
 
-  // Embed all chunks
+  // Embed all chunks (embeddings stay unencrypted — needed raw for pgvector)
   const embeddings = await embedBatch(chunks.map((c) => c.content));
 
-  // Insert chunks into database
+  // Derive per-user encryption key for content storage
+  const encKey = deriveUserKey(doc.user_id);
+
+  // Build chunk rows — content is AES-256-GCM encrypted
   const chunkRows = chunks.map((chunk, i) => ({
     document_id: documentId,
-    content: chunk.content,
+    content: encrypt(chunk.content, encKey), // encrypted at rest
     embedding: JSON.stringify(embeddings[i]),
     chunk_index: chunk.chunkIndex,
     metadata: chunk.metadata,
   }));
 
-  // Insert in batches of 50
+  // Insert chunks in batches of 50
+  const insertedIds: string[] = [];
   for (let i = 0; i < chunkRows.length; i += 50) {
     const batch = chunkRows.slice(i, i + 50);
-    const { error: insertError } = await admin.from("chunks").insert(batch);
+    const { data: inserted, error: insertError } = await admin
+      .from("chunks")
+      .insert(batch)
+      .select("id");
     if (insertError) {
       throw new Error(`Chunk insert failed: ${insertError.message}`);
     }
+    insertedIds.push(...(inserted ?? []).map((r) => r.id));
   }
+
+  // ── Entity extraction + graph edges ──────────────────────────────────────
+  // Extract entities from plaintext (before encryption), store graph edges.
+  // Runs after insert so we have real chunk IDs.
+  let totalEntities = 0;
+  for (let i = 0; i < chunks.length; i++) {
+    const chunkId = insertedIds[i];
+    if (!chunkId) continue;
+
+    const entities = extractEntities(chunks[i].content);
+    totalEntities += entities.length;
+
+    if (entities.length > 0) {
+      // Fire-and-forget per chunk — don't block on individual failures
+      storeChunkEntities(chunkId, doc.user_id, entities).catch((err) => {
+        console.error(`[ingest] entity store failed for chunk ${chunkId}:`, err);
+      });
+    }
+  }
+  console.log(
+    `[ingest] extracted ${totalEntities} entity mentions across ${chunks.length} chunks`
+  );
 
   // Generate a brief summary
   const summary = await generateSummary(parsedContent.text, doc.filename);
@@ -78,7 +111,7 @@ export async function ingestDocument(documentId: string) {
     })
     .eq("id", documentId);
 
-  return { chunks: chunks.length };
+  return { chunks: chunks.length, entities: totalEntities };
 }
 
 /**

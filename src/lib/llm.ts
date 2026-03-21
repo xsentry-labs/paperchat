@@ -1,31 +1,43 @@
+/**
+ * LLM provider abstraction.
+ *
+ * Supports two backends — configured via environment variables:
+ *   OPENROUTER_API_KEY  → routes through OpenRouter (all models in models.ts)
+ *   OPENAI_API_KEY      → direct OpenAI API (OpenAI models only)
+ *
+ * OpenRouter exposes an OpenAI-compatible API, so @ai-sdk/openai works for both.
+ * If both keys are present, OpenRouter takes precedence.
+ *
+ * Model IDs are managed in src/lib/models.ts.
+ * This file only owns the provider factory + system prompt.
+ */
+
 import { createOpenAI } from "@ai-sdk/openai";
 
-export const MODELS = {
-  fast: {
-    id: "gpt-4.1-mini",
-    label: "GPT-4.1 mini",
-    description: "Fast, everyday queries",
-  },
-  quality: {
-    id: "gpt-4.1",
-    label: "GPT-4.1",
-    description: "Best accuracy",
-  },
-  nano: {
-    id: "gpt-4.1-nano",
-    label: "GPT-4.1 nano",
-    description: "Lightweight, quick answers",
-  },
-  latest: {
-    id: "gpt-5.4-mini-2026-03-17",
-    label: "GPT-5.4 mini",
-    description: "Latest model",
-  },
-} as const;
+// Re-export legacy MODELS shape so existing code that imports from llm.ts still works.
+// New code should import from models.ts directly.
+export { DEFAULT_MODEL_ID } from "@/lib/models";
 
-export type ModelKey = keyof typeof MODELS;
+// Legacy ModelKey type — kept for compatibility with profile/model selector
+export type ModelKey = string;
 
+/**
+ * Create the AI SDK provider, pointed at either OpenRouter or OpenAI.
+ */
 export function createLLMProvider() {
+  if (process.env.OPENROUTER_API_KEY) {
+    return createOpenAI({
+      apiKey: process.env.OPENROUTER_API_KEY,
+      baseURL: "https://openrouter.ai/api/v1",
+      // OpenRouter recommends these headers for rate-limit tracking
+      headers: {
+        "HTTP-Referer": "https://paperchat.app",
+        "X-Title": "Paperchat",
+      },
+    });
+  }
+
+  // Fallback: direct OpenAI
   return createOpenAI({
     apiKey: process.env.OPENAI_API_KEY,
   });

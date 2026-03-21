@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
-import { MODELS, type ModelKey } from "@/lib/llm";
+import { ALL_MODELS, DEFAULT_MODEL_ID, PROVIDER_LABELS, COST_TIER_LABELS } from "@/lib/models";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
@@ -12,7 +12,7 @@ export default function SettingsPage() {
   const router = useRouter();
   const [email, setEmail] = useState("");
   const [isAnonymous, setIsAnonymous] = useState(false);
-  const [preferredModel, setPreferredModel] = useState<ModelKey>("fast");
+  const [preferredModel, setPreferredModel] = useState<string>(DEFAULT_MODEL_ID);
   const [docCount, setDocCount] = useState(0);
   const [totalSize, setTotalSize] = useState(0);
   const [saving, setSaving] = useState(false);
@@ -39,8 +39,8 @@ export default function SettingsPage() {
       const profileRes = await fetch("/api/profile");
       if (profileRes.ok) {
         const { profile } = await profileRes.json();
-        if (profile?.preferred_model && profile.preferred_model in MODELS) {
-          setPreferredModel(profile.preferred_model as ModelKey);
+        if (profile?.preferred_model) {
+          setPreferredModel(profile.preferred_model as string);
         }
       }
 
@@ -186,30 +186,47 @@ export default function SettingsPage() {
       <section className="space-y-3">
         <h2 className="text-sm font-medium text-muted-foreground uppercase tracking-wider">Default model</h2>
         <div className="rounded-lg border border-border bg-card p-4 space-y-4">
-          <div className="space-y-2">
-            {(Object.entries(MODELS) as [ModelKey, typeof MODELS[ModelKey]][]).map(
-              ([key, model]) => (
-                <label
-                  key={key}
-                  className={`flex cursor-pointer items-center gap-3 rounded-lg px-3 py-2 transition-colors ${
-                    preferredModel === key ? "bg-secondary" : "hover:bg-secondary/50"
-                  }`}
-                >
-                  <input
-                    type="radio"
-                    name="model"
-                    value={key}
-                    checked={preferredModel === key}
-                    onChange={() => setPreferredModel(key)}
-                    className="accent-primary"
-                  />
-                  <div>
-                    <p className="text-sm font-medium text-foreground">{model.label}</p>
-                    <p className="text-xs text-muted-foreground">{model.description}</p>
+          <div className="space-y-4">
+            <p className="text-xs text-muted-foreground/60">
+              Non-OpenAI models require <code className="text-muted-foreground">OPENROUTER_API_KEY</code>.
+            </p>
+            {/* Group by provider */}
+            {(["openai", "anthropic", "google", "meta", "mistral", "deepseek"] as const).map((provider) => {
+              const providerModels = ALL_MODELS.filter((m) => m.provider === provider);
+              return (
+                <div key={provider}>
+                  <p className="text-[10px] uppercase tracking-widest text-muted-foreground/40 mb-1">
+                    {PROVIDER_LABELS[provider]}
+                  </p>
+                  <div className="space-y-1">
+                    {providerModels.map((model) => (
+                      <label
+                        key={model.id}
+                        className={`flex cursor-pointer items-center gap-3 rounded-lg px-3 py-2 transition-colors ${
+                          preferredModel === model.id ? "bg-secondary" : "hover:bg-secondary/50"
+                        }`}
+                      >
+                        <input
+                          type="radio"
+                          name="model"
+                          value={model.id}
+                          checked={preferredModel === model.id}
+                          onChange={() => setPreferredModel(model.id)}
+                          className="accent-primary"
+                        />
+                        <div className="flex-1 min-w-0">
+                          <p className="text-sm font-medium text-foreground">{model.label}</p>
+                          <p className="text-xs text-muted-foreground">{model.description}</p>
+                        </div>
+                        <span className="text-[10px] text-muted-foreground/40 shrink-0">
+                          {COST_TIER_LABELS[model.costTier]} · {model.contextK}k
+                        </span>
+                      </label>
+                    ))}
                   </div>
-                </label>
-              )
-            )}
+                </div>
+              );
+            })}
           </div>
           <Button onClick={handleSaveModel} loading={saving} size="sm">
             Save preference
