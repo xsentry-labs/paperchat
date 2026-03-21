@@ -41,10 +41,12 @@ export function extractEntities(text: string): ExtractedEntity[] {
   const entities: ExtractedEntity[] = [];
 
   function add(name: string, type: EntityType) {
-    const normalized = name.toLowerCase().trim();
-    // Skip short/already-seen names
+    // Strip leading/trailing punctuation that compromise attaches from mid-sentence extraction
+    const normalized = name.toLowerCase().trim().replace(/^[^\w]+|[^\w]+$/g, "").trim();
     if (normalized.length < MIN_NAME_LENGTH) return;
     if (seen.has(normalized)) return;
+    // Skip if it looks like a math symbol, formula fragment, or number
+    if (/^[\d\s.,()\[\]{}+\-*/=<>^_]+$/.test(normalized)) return;
     seen.add(normalized);
     entities.push({ name: normalized, type });
   }

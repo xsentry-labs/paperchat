@@ -140,11 +140,6 @@ function LogEntry({ log }: { log: AgentLog }) {
             <span className="text-[10px] text-muted-foreground/40">
               {log.retrieved_chunks.length} chunk{log.retrieved_chunks.length !== 1 ? "s" : ""}
             </span>
-            {log.entities_used.length > 0 && (
-              <span className="text-[10px] text-muted-foreground/40">
-                {log.entities_used.length} entit{log.entities_used.length !== 1 ? "ies" : "y"}
-              </span>
-            )}
           </div>
         </div>
 
@@ -197,25 +192,6 @@ function LogEntry({ log }: { log: AgentLog }) {
                       </div>
                     )}
                   </div>
-                ))}
-              </div>
-            </div>
-          )}
-
-          {/* Entities */}
-          {log.entities_used.length > 0 && (
-            <div>
-              <p className="text-[10px] uppercase tracking-wider text-muted-foreground/40 mb-2">
-                Entities used
-              </p>
-              <div className="flex flex-wrap gap-1.5">
-                {log.entities_used.map((e, i) => (
-                  <span
-                    key={i}
-                    className="inline-flex items-center rounded-md border border-border/30 bg-white/[0.04] px-2 py-0.5 text-[10px] text-foreground/50"
-                  >
-                    {e.name}
-                  </span>
                 ))}
               </div>
             </div>

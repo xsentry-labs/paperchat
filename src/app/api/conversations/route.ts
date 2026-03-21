@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
+import { createAdminClient } from "@/lib/supabase/admin";
 
 export async function GET() {
   const supabase = await createClient();
@@ -32,6 +33,12 @@ export async function POST(request: Request) {
   if (!user) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
+
+  // Ensure profile exists — guards against DB resets or trigger failures
+  const admin = createAdminClient();
+  await admin
+    .from("profiles")
+    .upsert({ id: user.id, email: user.email ?? null }, { onConflict: "id" });
 
   const { document_id, title } = await request.json();
 
