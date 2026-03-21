@@ -4,7 +4,7 @@ import { useRef } from "react";
 import { ACCEPTED_EXTENSIONS } from "@/lib/constants";
 
 interface UploadButtonProps {
-  onFileSelect: (file: File) => void;
+  onFileSelect: (files: File[]) => void;
   loading: boolean;
 }
 
@@ -12,13 +12,13 @@ export function UploadButton({ onFileSelect, loading }: UploadButtonProps) {
   const inputRef = useRef<HTMLInputElement>(null);
 
   function handleChange(e: React.ChangeEvent<HTMLInputElement>) {
-    const file = e.target.files?.[0];
-    if (file) { onFileSelect(file); e.target.value = ""; }
+    const files = Array.from(e.target.files ?? []);
+    if (files.length > 0) { onFileSelect(files); e.target.value = ""; }
   }
 
   return (
     <>
-      <input ref={inputRef} type="file" accept={ACCEPTED_EXTENSIONS.join(",")} onChange={handleChange} className="hidden" />
+      <input ref={inputRef} type="file" multiple accept={ACCEPTED_EXTENSIONS.join(",")} onChange={handleChange} className="hidden" />
       <button
         onClick={() => inputRef.current?.click()}
         disabled={loading}

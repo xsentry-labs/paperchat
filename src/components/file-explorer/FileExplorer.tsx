@@ -58,32 +58,32 @@ export function FileExplorer() {
     };
   }, [documents, fetchDocuments]);
 
-  async function handleUpload(file: File) {
-    // Client-side size check before upload
-    if (file.size > MAX_FILE_SIZE) {
-      setError(`File too large. Maximum size is ${MAX_FILE_SIZE / 1024 / 1024}MB.`);
+  async function handleUpload(files: File[]) {
+    const oversized = files.find((f) => f.size > MAX_FILE_SIZE);
+    if (oversized) {
+      setError(`"${oversized.name}" is too large. Maximum size is ${MAX_FILE_SIZE / 1024 / 1024}MB.`);
       return;
     }
 
     setUploading(true);
     setError(null);
 
-    const formData = new FormData();
-    formData.append("file", file);
-
     try {
-      const res = await fetch("/api/upload", {
-        method: "POST",
-        body: formData,
-      });
+      const results = await Promise.all(
+        files.map(async (file) => {
+          const formData = new FormData();
+          formData.append("file", file);
+          const res = await fetch("/api/upload", { method: "POST", body: formData });
+          if (!res.ok) {
+            const data = await res.json();
+            return data.error ?? `Failed to upload "${file.name}"`;
+          }
+          return null;
+        })
+      );
 
-      if (!res.ok) {
-        const data = await res.json();
-        setError(data.error ?? "Upload failed");
-        return;
-      }
-
-      // Refresh list
+      const errors = results.filter(Boolean) as string[];
+      if (errors.length > 0) setError(errors.join("; "));
       await fetchDocuments();
     } catch {
       setError("Upload failed. Please try again.");

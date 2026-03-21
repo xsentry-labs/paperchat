@@ -89,13 +89,21 @@ export default function ArtifactsPage() {
     return () => { if (pollingRef.current) { clearInterval(pollingRef.current); pollingRef.current = null; } };
   }, [documents, fetchDocuments]);
 
-  async function handleUpload(file: File) {
-    if (file.size > MAX_FILE_SIZE) { setError(`Max ${MAX_FILE_SIZE / 1024 / 1024}MB.`); return; }
+  async function handleUpload(files: File[]) {
+    const oversized = files.find((f) => f.size > MAX_FILE_SIZE);
+    if (oversized) { setError(`"${oversized.name}" exceeds the ${MAX_FILE_SIZE / 1024 / 1024}MB limit.`); return; }
     setUploading(true); setError(null);
-    const formData = new FormData(); formData.append("file", file);
     try {
-      const res = await fetch("/api/upload", { method: "POST", body: formData });
-      if (!res.ok) { setError((await res.json()).error ?? "Upload failed"); return; }
+      const results = await Promise.all(
+        files.map(async (file) => {
+          const formData = new FormData(); formData.append("file", file);
+          const res = await fetch("/api/upload", { method: "POST", body: formData });
+          if (!res.ok) { const d = await res.json(); return d.error ?? `Failed to upload "${file.name}"`; }
+          return null;
+        })
+      );
+      const errors = results.filter(Boolean) as string[];
+      if (errors.length > 0) setError(errors.join("; "));
       await fetchDocuments();
     } catch { setError("Upload failed."); } finally { setUploading(false); }
   }
@@ -139,13 +147,14 @@ export default function ArtifactsPage() {
     e.stopPropagation();
     setDragging(false);
     dragCounter.current = 0;
-    const file = e.dataTransfer.files?.[0];
-    if (!file) return;
-    if (!(ACCEPTED_FILE_TYPES as readonly string[]).includes(file.type)) {
-      setError("Unsupported file type. Use PDF, TXT, MD, or DOCX.");
+    const files = Array.from(e.dataTransfer.files);
+    if (files.length === 0) return;
+    const invalid = files.find((f) => !(ACCEPTED_FILE_TYPES as readonly string[]).includes(f.type));
+    if (invalid) {
+      setError(`Unsupported file type: "${invalid.name}". Use PDF, DOCX, PPTX, XLSX, TXT, MD, HTML, or EPUB.`);
       return;
     }
-    handleUpload(file);
+    handleUpload(files);
   }
 
   const docsByType = (mimeType: string) => documents.filter((d) => d.mime_type === mimeType);
