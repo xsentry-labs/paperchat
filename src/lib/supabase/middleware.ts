@@ -41,11 +41,13 @@ export async function updateSession(request: NextRequest) {
   // Don't redirect them — a redirect response breaks fetch() calls from the client.
   const isApiRoute = request.nextUrl.pathname.startsWith("/api/");
 
-  // Unauthenticated users can only access auth routes
+  // Unauthenticated users can only access auth routes.
+  // Explicitly use 307 (Temporary Redirect) so the browser does NOT cache
+  // this redirect — the auth state is transient and will change after login.
   if (!user && !isAuthRoute && !isApiRoute && !request.nextUrl.pathname.startsWith("/auth")) {
     const url = request.nextUrl.clone();
     url.pathname = "/login";
-    return NextResponse.redirect(url);
+    return NextResponse.redirect(url, 307);
   }
 
   // Authenticated non-anonymous users shouldn't see auth pages
@@ -54,7 +56,7 @@ export async function updateSession(request: NextRequest) {
   if (user && !isAnonymous && isAuthRoute && !isResetPassword) {
     const url = request.nextUrl.clone();
     url.pathname = "/";
-    return NextResponse.redirect(url);
+    return NextResponse.redirect(url, 307);
   }
 
   return supabaseResponse;
