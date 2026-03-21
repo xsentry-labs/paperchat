@@ -39,7 +39,7 @@ const components: Components = {
     const isBlock = className?.includes("language-");
     if (isBlock) {
       return (
-        <pre className="my-3 overflow-x-auto max-w-full rounded-md bg-black/30 border border-border/40 p-3 text-[11px] leading-relaxed font-mono">
+        <pre className="my-3 overflow-x-auto max-w-full rounded-md bg-muted border border-border/40 p-3 text-[11px] leading-relaxed font-mono">
           <code>{children}</code>
         </pre>
       );

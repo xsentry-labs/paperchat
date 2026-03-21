@@ -9,6 +9,7 @@
  */
 
 import { useEffect, useRef, useState, useCallback } from "react";
+import { useTheme } from "@/components/ThemeProvider";
 
 // ── Types ──────────────────────────────────────────────────────────────────
 
@@ -35,13 +36,39 @@ interface GraphData {
   edges: GraphEdge[];
 }
 
-// ── Constants ──────────────────────────────────────────────────────────────
+// ── Theme-aware canvas colors ──────────────────────────────────────────────
 
-const NODE_COLOR = "#e2e8f0";
-const EDGE_COLOR = "rgba(148,163,184,0.18)";
-const EDGE_HIGHLIGHT = "rgba(148,163,184,0.55)";
-const LABEL_COLOR = "rgba(226,232,240,0.85)";
-const LABEL_DIM = "rgba(148,163,184,0.2)";
+const DARK_COLORS = {
+  node:           "#e2e8f0",
+  nodeFill:       "rgba(226,232,240,0.75)",
+  nodeHover:      "rgba(226,232,240,0.95)",
+  nodeSelected:   "#ffffff",
+  nodeDim:        "rgba(226,232,240,0.08)",
+  nodeRing:       "rgba(226,232,240,0.25)",
+  nodeRingActive: "rgba(226,232,240,0.6)",
+  edge:           "rgba(148,163,184,0.18)",
+  edgeHighlight:  "rgba(148,163,184,0.55)",
+  label:          "rgba(226,232,240,0.85)",
+  labelBold:      "rgba(226,232,240,0.9)",
+  labelDim:       "rgba(148,163,184,0.2)",
+  glow:           "#e2e8f0",
+};
+
+const LIGHT_COLORS = {
+  node:           "#44403c",
+  nodeFill:       "rgba(68,64,60,0.7)",
+  nodeHover:      "rgba(28,25,23,0.9)",
+  nodeSelected:   "#1c1917",
+  nodeDim:        "rgba(68,64,60,0.08)",
+  nodeRing:       "rgba(68,64,60,0.2)",
+  nodeRingActive: "rgba(68,64,60,0.5)",
+  edge:           "rgba(120,113,108,0.2)",
+  edgeHighlight:  "rgba(120,113,108,0.5)",
+  label:          "rgba(28,25,23,0.75)",
+  labelBold:      "rgba(28,25,23,0.9)",
+  labelDim:       "rgba(120,113,108,0.25)",
+  glow:           "#78716c",
+};
 
 const REPULSION = 6000;
 const ATTRACTION = 0.04;
@@ -79,15 +106,15 @@ function DetailPanel({
     .filter((l) => l.peer);
 
   return (
-    <div className="absolute top-3 right-3 w-60 rounded-xl border border-white/10 bg-[#08080d]/95 backdrop-blur-sm shadow-2xl p-3 z-10">
+    <div className="absolute top-3 right-3 w-60 rounded-xl border border-border bg-card/95 backdrop-blur-sm shadow-xl p-3 z-10">
       <div className="flex items-start justify-between mb-3">
         <div className="min-w-0 pr-2">
-          <p className="text-[9px] uppercase tracking-widest text-slate-600 mb-1">Document</p>
+          <p className="text-[9px] uppercase tracking-widest text-muted-foreground/50 mb-1">Document</p>
           <p className="text-xs text-slate-200 leading-snug break-words">{node.label}</p>
         </div>
         <button
           onClick={onClose}
-          className="shrink-0 text-slate-700 hover:text-slate-400 transition-colors mt-0.5"
+          className="shrink-0 text-muted-foreground/40 hover:text-muted-foreground transition-colors mt-0.5"
         >
           <svg className="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
             <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
@@ -97,16 +124,16 @@ function DetailPanel({
 
       {node.summary && (
         <div className="mb-3">
-          <p className="text-[9px] uppercase tracking-widest text-slate-600 mb-1">Summary</p>
+          <p className="text-[9px] uppercase tracking-widest text-muted-foreground/50 mb-1">Summary</p>
           <p className="text-[10px] text-slate-400 leading-relaxed line-clamp-4">{node.summary}</p>
         </div>
       )}
 
       {links.length === 0 ? (
-        <p className="text-[10px] text-slate-600">No links yet — upload more documents.</p>
+        <p className="text-[10px] text-muted-foreground/50">No links yet — upload more documents.</p>
       ) : (
         <>
-          <p className="text-[9px] uppercase tracking-widest text-slate-600 mb-2">
+          <p className="text-[9px] uppercase tracking-widest text-muted-foreground/50 mb-2">
             Linked to {links.length} document{links.length !== 1 ? "s" : ""}
           </p>
           <div className="space-y-2 max-h-40 overflow-y-auto pr-0.5">
@@ -116,7 +143,7 @@ function DetailPanel({
                   <span className="text-[10px] text-slate-300 leading-snug truncate pr-2">
                     {peer.label}
                   </span>
-                  <span className="shrink-0 text-[9px] text-slate-600">
+                  <span className="shrink-0 text-[9px] text-muted-foreground/50">
                     {weight} shared
                   </span>
                 </div>
@@ -124,13 +151,13 @@ function DetailPanel({
                   {shared.slice(0, 5).map((s) => (
                     <span
                       key={s}
-                      className="text-[8px] rounded px-1 py-0.5 bg-slate-800/60 text-slate-500"
+                      className="text-[8px] rounded px-1 py-0.5 bg-muted text-muted-foreground/60"
                     >
                       {s}
                     </span>
                   ))}
                   {shared.length > 5 && (
-                    <span className="text-[8px] text-slate-700">+{shared.length - 5}</span>
+                    <span className="text-[8px] text-muted-foreground/40">+{shared.length - 5}</span>
                   )}
                 </div>
               </div>
@@ -155,6 +182,8 @@ export function KnowledgeGraph() {
   const transformRef = useRef({ x: 0, y: 0, scale: 1 });
   const isPanningRef = useRef(false);
   const panStartRef = useRef({ mx: 0, my: 0, tx: 0, ty: 0 });
+
+  const { theme } = useTheme();
 
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -196,6 +225,7 @@ export function KnowledgeGraph() {
 
   // ── Physics + draw tick ──────────────────────────────────────────────────
   const tick = useCallback((canvas: HTMLCanvasElement) => {
+    const colors = theme === "light" ? LIGHT_COLORS : DARK_COLORS;
     const nodes = nodesRef.current;
     if (nodes.length === 0) return;
 
@@ -273,7 +303,7 @@ export function KnowledgeGraph() {
       ctx.beginPath();
       ctx.moveTo(a.x ?? 0, a.y ?? 0);
       ctx.lineTo(b.x ?? 0, b.y ?? 0);
-      ctx.strokeStyle = isHighlighted ? EDGE_HIGHLIGHT : EDGE_COLOR;
+      ctx.strokeStyle = isHighlighted ? colors.edgeHighlight : colors.edge;
       ctx.lineWidth = isHighlighted
         ? Math.max(1, Math.min(3, Math.log1p(e.weight)))
         : Math.max(0.5, Math.min(2, Math.log1p(e.weight) * 0.6));
@@ -291,24 +321,24 @@ export function KnowledgeGraph() {
 
       // Glow
       ctx.shadowBlur = isSelected || isHovered ? 16 : n.degree > 0 ? 4 : 0;
-      ctx.shadowColor = NODE_COLOR;
+      ctx.shadowColor = colors.glow;
 
       ctx.beginPath();
       ctx.arc(n.x ?? 0, n.y ?? 0, isHovered || isSelected ? r + 2 : r, 0, Math.PI * 2);
       ctx.fillStyle = isDim
-        ? "rgba(226,232,240,0.08)"
+        ? colors.nodeDim
         : isSelected
-        ? "#fff"
+        ? colors.nodeSelected
         : isHovered
-        ? "rgba(226,232,240,0.95)"
-        : "rgba(226,232,240,0.75)";
+        ? colors.nodeHover
+        : colors.nodeFill;
       ctx.fill();
 
       // Outer ring for connected nodes
       if (n.degree > 0 && !isDim) {
         ctx.strokeStyle = isSelected || isHovered
-          ? "rgba(226,232,240,0.6)"
-          : "rgba(226,232,240,0.25)";
+          ? colors.nodeRingActive
+          : colors.nodeRing;
         ctx.lineWidth = 1;
         ctx.stroke();
       }
@@ -318,18 +348,17 @@ export function KnowledgeGraph() {
       // Label
       const showLabel = isHovered || isSelected || !q || n.label.toLowerCase().includes(q);
       if (showLabel) {
-        // Strip extension for cleaner display
         const name = n.label.replace(/\.[^.]+$/, "");
         const label = name.length > 26 ? name.slice(0, 24) + "…" : name;
         ctx.font = isSelected ? "bold 11px sans-serif" : "10px sans-serif";
-        ctx.fillStyle = isDim ? LABEL_DIM : LABEL_COLOR;
+        ctx.fillStyle = isDim ? colors.labelDim : isSelected ? colors.labelBold : colors.label;
         ctx.textAlign = "center";
         ctx.fillText(label, n.x ?? 0, (n.y ?? 0) + r + 13);
       }
     }
 
     ctx.restore();
-  }, [search]);
+  }, [search, theme]);
 
   // ── Animation loop ────────────────────────────────────────────────────────
   useEffect(() => {
@@ -472,7 +501,7 @@ export function KnowledgeGraph() {
   }
   if (docCount === 1) {
     return (
-      <div className="relative h-full w-full bg-[#0a0a0f]" style={{ borderRadius: "inherit" }}>
+      <div className="relative h-full w-full bg-background" style={{ borderRadius: "inherit" }}>
         <canvas
           ref={canvasRef}
           className="h-full w-full"
@@ -484,7 +513,7 @@ export function KnowledgeGraph() {
           onWheel={handleWheel}
         />
         <div className="absolute bottom-3 left-0 right-0 flex justify-center pointer-events-none">
-          <p className="text-[10px] text-slate-700 bg-black/40 px-3 py-1 rounded-full backdrop-blur-sm">
+          <p className="text-[10px] text-muted-foreground/50 bg-card/60 px-3 py-1 rounded-full backdrop-blur-sm border border-border/40">
             Upload more documents to see connections
           </p>
         </div>
@@ -501,7 +530,7 @@ export function KnowledgeGraph() {
   }
 
   return (
-    <div className="relative h-full w-full bg-[#0a0a0f]" style={{ borderRadius: "inherit" }}>
+    <div className="relative h-full w-full bg-background" style={{ borderRadius: "inherit" }}>
       <canvas
         ref={canvasRef}
         className="h-full w-full"
@@ -520,21 +549,21 @@ export function KnowledgeGraph() {
           placeholder="Search documents…"
           value={search}
           onChange={(e) => setSearch(e.target.value)}
-          className="w-36 rounded-md border border-white/10 bg-black/50 px-2 py-1 text-[10px] text-slate-300 placeholder:text-slate-600 focus:outline-none focus:border-white/20 backdrop-blur-sm"
+          className="w-36 rounded-md border border-border bg-card/80 px-2 py-1 text-[10px] text-foreground/70 placeholder:text-muted-foreground/40 focus:outline-none focus:border-border/60 backdrop-blur-sm"
         />
       </div>
 
       {/* Doc count */}
       <div className="absolute top-3 right-3">
         {!selectedNode && (
-          <span className="text-[9px] text-slate-700">{docCount} documents</span>
+          <span className="text-[9px] text-muted-foreground/40">{docCount} documents</span>
         )}
       </div>
 
       {/* Hints */}
       <div className="absolute bottom-3 right-3 flex flex-col items-end gap-0.5 pointer-events-none">
-        <p className="text-[9px] text-slate-800">scroll to zoom · drag to pan</p>
-        <p className="text-[9px] text-slate-800">click document for links</p>
+        <p className="text-[9px] text-muted-foreground/30">scroll to zoom · drag to pan</p>
+        <p className="text-[9px] text-muted-foreground/30">click document for links</p>
       </div>
 
       {/* Detail panel */}

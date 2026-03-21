@@ -1,5 +1,6 @@
 @import "tailwindcss";
 
+/* ── Dark mode (default) ──────────────────────────────────────────────────── */
 :root {
   --background: #0d0d0d;
   --foreground: #ececec;
@@ -19,6 +20,29 @@
   --ring: rgba(255, 255, 255, 0.12);
   --sidebar: #0a0a0a;
   --hover: rgba(255, 255, 255, 0.05);
+}
+
+/* ── Light mode — warm linen ──────────────────────────────────────────────── */
+/*    Inspired by Linear, Craft, and Notion. Warm off-white, not sterile.    */
+html.light {
+  --background: #f8f7f4;
+  --foreground: #1c1917;
+  --card: #ffffff;
+  --card-foreground: #1c1917;
+  --border: rgba(28, 25, 23, 0.09);
+  --input: #edeae4;
+  --primary: #1c1917;
+  --primary-foreground: #f8f7f4;
+  --secondary: rgba(28, 25, 23, 0.05);
+  --secondary-foreground: #78716c;
+  --destructive: #dc2626;
+  --destructive-foreground: #ffffff;
+  --muted: #edeae4;
+  --muted-foreground: #78716c;
+  --accent: #1c1917;
+  --ring: rgba(28, 25, 23, 0.14);
+  --sidebar: #efece7;
+  --hover: rgba(28, 25, 23, 0.05);
 }
 
 @theme inline {
@@ -59,8 +83,8 @@ body {
 /* Scrollbar */
 ::-webkit-scrollbar { width: 4px; }
 ::-webkit-scrollbar-track { background: transparent; }
-::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.08); border-radius: 4px; }
-::-webkit-scrollbar-thumb:hover { background: rgba(255,255,255,0.14); }
+::-webkit-scrollbar-thumb { background: rgba(128,128,128,0.2); border-radius: 4px; }
+::-webkit-scrollbar-thumb:hover { background: rgba(128,128,128,0.35); }
 
 /* Animations */
 @keyframes pulse-dot {
@@ -80,9 +104,8 @@ body {
 }
 
 /* Selection */
-::selection {
-  background: rgba(255, 255, 255, 0.15);
-}
+:root ::selection { background: rgba(255, 255, 255, 0.15); }
+html.light ::selection { background: rgba(28, 25, 23, 0.12); }
 
 /* Prevent overscroll bounce on mobile */
 html, body {
