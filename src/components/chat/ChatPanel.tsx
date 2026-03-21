@@ -99,7 +99,6 @@ function SourcesCollapsible({ citations }: { citations: Citation[] }) {
 export function ChatPanel({ conversationId, initialQuestion }: ChatPanelProps) {
   const [history, setHistory] = useState<ChatMessage[]>([]);
   const [historyLoading, setHistoryLoading] = useState(true);
-  const [citations, setCitations] = useState<Record<string, Citation[]>>({});
   const [inputValue, setInputValue] = useState("");
   const [currentModel, setCurrentModel] = useState<string>(DEFAULT_MODEL_ID);
   const [chatError, setChatError] = useState<string | null>(null);
@@ -118,11 +117,6 @@ export function ChatPanel({ conversationId, initialQuestion }: ChatPanelProps) {
       if (msgRes.ok) {
         const data = await msgRes.json();
         setHistory(data.messages);
-        const citMap: Record<string, Citation[]> = {};
-        for (const msg of data.messages) {
-          if (msg.role === "assistant" && msg.sources) citMap[msg.id] = msg.sources;
-        }
-        setCitations(citMap);
       }
       if (profileRes.ok) {
         const { profile } = await profileRes.json();
@@ -149,20 +143,10 @@ export function ChatPanel({ conversationId, initialQuestion }: ChatPanelProps) {
     onFinish() {
       setChatError(null);
       window.dispatchEvent(new Event("conversation-updated"));
-      setTimeout(() => {
-        Promise.all([
-          fetch(`/api/conversations/${conversationId}/messages`).then((r) => r.json()),
-          fetch("/api/rate-limit").then((r) => r.json()),
-        ]).then(([msgData, rlData]) => {
-          setHistory(msgData.messages);
-          const citMap: Record<string, Citation[]> = {};
-          for (const msg of msgData.messages) {
-            if (msg.role === "assistant" && msg.sources) citMap[msg.id] = msg.sources;
-          }
-          setCitations(citMap);
-          setRateLimitRemaining(rlData.remaining ?? null);
-        });
-      }, 1500);
+      // Refresh rate limit count only (no history refetch - avoids blink)
+      fetch("/api/rate-limit")
+        .then((r) => r.json())
+        .then((data) => setRateLimitRemaining(data.remaining ?? null));
     },
   });
 
@@ -186,9 +170,30 @@ export function ChatPanel({ conversationId, initialQuestion }: ChatPanelProps) {
     return (msg as { content?: string }).content ?? "";
   }
 
-  const streamingMessages = messages.map((m) => ({ id: m.id, role: m.role as "user" | "assistant", content: getTextContent(m) }));
+  // Sources come from message.metadata (streaming) or message.sources (history from DB)
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  function getSources(msg: any): Citation[] {
+    const meta = msg.metadata as { sources?: Citation[] } | undefined;
+    if (meta?.sources?.length) return meta.sources;
+    const sources = msg.sources as Citation[] | undefined;
+    if (sources?.length) return sources;
+    return [];
+  }
+
+  // history covers messages from before this session; streamingMessages covers new ones
+  // deduplicate by content so initial history doesn't double with streaming
   const historyIds = new Set(history.map((h) => h.content));
-  const displayMessages = [...history, ...streamingMessages.filter((m) => !historyIds.has(m.content))];
+  const streamingMessages = messages.map((m) => ({
+    id: m.id,
+    role: m.role as "user" | "assistant",
+    content: getTextContent(m),
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    metadata: (m as any).metadata,
+  }));
+  const displayMessages = [
+    ...history,
+    ...streamingMessages.filter((m) => !historyIds.has(m.content)),
+  ];
 
   async function submitMessage(text: string) {
     if (!text.trim() || isLoading) return;
@@ -251,7 +256,8 @@ export function ChatPanel({ conversationId, initialQuestion }: ChatPanelProps) {
           ) : null}
 
           {displayMessages.map((msg, i) => {
-            const content = "content" in msg ? msg.content : "";
+            const content = "content" in msg ? (msg.content as string) : "";
+            const sources = getSources(msg);
             return (
               <div key={msg.id || i} className="animate-fade-in">
                 {msg.role === "user" ? (
@@ -267,8 +273,8 @@ export function ChatPanel({ conversationId, initialQuestion }: ChatPanelProps) {
                       <MarkdownContent content={content} />
                     </div>
 
-                    {citations[msg.id] && citations[msg.id].length > 0 && (
-                      <SourcesCollapsible citations={citations[msg.id]} />
+                    {sources.length > 0 && (
+                      <SourcesCollapsible citations={sources} />
                     )}
                   </div>
                 )}
