@@ -33,7 +33,7 @@ export function ConversationList() {
     const id = confirmDeleteId;
     setConfirmDeleteId(null);
 
-    const res = await authFetch(`/api/conversations?id=${encodeURIComponent(id)}`, {
+    const res = await authFetch(`/api/conversations/${encodeURIComponent(id)}`, {
       method: "DELETE",
     });
     if (res.ok) {

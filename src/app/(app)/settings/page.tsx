@@ -75,7 +75,7 @@ export default function SettingsPage() {
       const { documents } = await docsRes.json();
       await Promise.all(
         documents.map((doc: { id: string }) =>
-          authFetch(`/api/documents?id=${encodeURIComponent(doc.id)}`, { method: "DELETE" })
+          authFetch(`/api/documents/${encodeURIComponent(doc.id)}`, { method: "DELETE" })
         )
       );
     }

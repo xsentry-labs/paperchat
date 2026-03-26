@@ -113,7 +113,7 @@ export default function ArtifactsPage() {
     if (!confirmDelete) return;
     const { id } = confirmDelete;
     setConfirmDelete(null);
-    const res = await authFetch(`/api/documents?id=${encodeURIComponent(id)}`, { method: "DELETE" });
+    const res = await authFetch(`/api/documents/${encodeURIComponent(id)}`, { method: "DELETE" });
     if (res.ok) {
       setDocuments((p) => p.filter((d) => d.id !== id));
     }

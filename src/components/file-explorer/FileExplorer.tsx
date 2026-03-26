@@ -100,7 +100,7 @@ export function FileExplorer() {
     setDeletingId(docId);
 
     try {
-      const res = await authFetch(`/api/documents?id=${encodeURIComponent(docId)}`, {
+      const res = await authFetch(`/api/documents/${encodeURIComponent(docId)}`, {
         method: "DELETE",
       });
 
