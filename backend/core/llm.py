@@ -69,7 +69,6 @@ async def llm_chat(
         "messages": messages,
         "temperature": temperature,
         "max_tokens": max_tokens,
-        "stream": True,
     }
     if tools:
         kwargs["tools"] = tools
