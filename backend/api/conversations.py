@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Query, status
 from pydantic import BaseModel
 from core.auth import get_current_user, AuthUser
 from core.supabase import get_supabase_admin
@@ -12,16 +12,24 @@ class CreateConversationRequest(BaseModel):
 
 
 @router.get("/api/conversations")
-async def list_conversations(user: AuthUser = Depends(get_current_user)):
+async def list_conversations(
+    user: AuthUser = Depends(get_current_user),
+    limit: int = Query(default=50, ge=1, le=200),
+    offset: int = Query(default=0, ge=0),
+):
     supabase = get_supabase_admin()
     result = (
         supabase.table("conversations")
-        .select("*, documents(filename)")
+        .select("*, documents(filename)", count="exact")
         .eq("user_id", user.id)
         .order("updated_at", desc=True)
+        .range(offset, offset + limit - 1)
         .execute()
     )
-    return {"conversations": result.data or []}
+    return {
+        "conversations": result.data or [],
+        "total": result.count or 0,
+    }
 
 
 @router.post("/api/conversations", status_code=status.HTTP_201_CREATED)

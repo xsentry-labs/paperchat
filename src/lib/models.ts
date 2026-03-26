@@ -22,6 +22,8 @@ export type ModelProvider =
 
 export type CostTier = "free" | "cheap" | "mid" | "premium";
 
+export type ModelKey = string;
+
 export interface ModelDefinition {
   id: string;            // OpenRouter model ID (used in API calls)
   label: string;         // Display name in UI

@@ -39,15 +39,21 @@ class LLMResponse:
         return msg
 
 
+_client: AsyncOpenAI | None = None
+
+
 def _get_client() -> AsyncOpenAI:
-    return AsyncOpenAI(
-        api_key=settings.openrouter_api_key,
-        base_url="https://openrouter.ai/api/v1",
-        default_headers={
-            "HTTP-Referer": "https://paperchat.app",
-            "X-Title": "Paperchat",
-        },
-    )
+    global _client
+    if _client is None:
+        _client = AsyncOpenAI(
+            api_key=settings.openrouter_api_key,
+            base_url="https://openrouter.ai/api/v1",
+            default_headers={
+                "HTTP-Referer": "https://paperchat.app",
+                "X-Title": "Paperchat",
+            },
+        )
+    return _client
 
 
 async def llm_chat(

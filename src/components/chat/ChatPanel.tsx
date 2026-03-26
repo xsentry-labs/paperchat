@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useChat } from "@ai-sdk/react";
 import { DefaultChatTransport } from "ai";
 import type { ChatMessage } from "@/lib/types";
@@ -30,6 +30,18 @@ const STARTERS = [
   "Summarize the key points",
   "What are the main conclusions?",
 ];
+
+const TOOL_LABELS: Record<string, string> = {
+  vector_search: "Searching documents",
+  knowledge_graph: "Exploring knowledge graph",
+  read_document: "Reading document",
+  web_search: "Searching the web",
+  web_fetch: "Fetching page",
+  python_exec: "Running analysis",
+  plot_chart: "Generating chart",
+  sql_query: "Querying data",
+  spawn_subagent: "Delegating to subagent",
+};
 
 function SourcesCollapsible({ citations }: { citations: Citation[] }) {
   const [open, setOpen] = useState(false);
@@ -132,18 +144,6 @@ export function ChatPanel({ conversationId, initialQuestion }: ChatPanelProps) {
     load();
   }, [conversationId]);
 
-  const TOOL_LABELS: Record<string, string> = {
-    vector_search: "Searching documents",
-    knowledge_graph: "Exploring knowledge graph",
-    read_document: "Reading document",
-    web_search: "Searching the web",
-    web_fetch: "Fetching page",
-    python_exec: "Running analysis",
-    plot_chart: "Generating chart",
-    sql_query: "Querying data",
-    spawn_subagent: "Delegating to subagent",
-  };
-
   // Intercept the SSE stream to extract tool_event chunks (2: format) for progress display.
   // In AI SDK v6, `data` was removed from useChat; we tee the response stream instead.
   const trackingFetch = useCallback(async (input: RequestInfo | URL, init?: RequestInit): Promise<Response> => {
@@ -236,20 +236,21 @@ export function ChatPanel({ conversationId, initialQuestion }: ChatPanelProps) {
     return [];
   }
 
-  // history covers messages from before this session; streamingMessages covers new ones
-  // deduplicate by content so initial history doesn't double with streaming
-  const historyIds = new Set(history.map((h) => h.content));
-  const streamingMessages = messages.map((m) => ({
-    id: m.id,
-    role: m.role as "user" | "assistant",
-    content: getTextContent(m),
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    metadata: (m as any).metadata,
-  }));
-  const displayMessages = [
-    ...history,
-    ...streamingMessages.filter((m) => !historyIds.has(m.content)),
-  ];
+  // Memoize message dedup — history + streaming messages merged without duplicates
+  const displayMessages = useMemo(() => {
+    const historyIds = new Set(history.map((h) => h.content));
+    const streamingMsgs = messages.map((m) => ({
+      id: m.id,
+      role: m.role as "user" | "assistant",
+      content: getTextContent(m),
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      metadata: (m as any).metadata,
+    }));
+    return [
+      ...history,
+      ...streamingMsgs.filter((m) => !historyIds.has(m.content)),
+    ];
+  }, [history, messages]);
 
   async function submitMessage(text: string) {
     if (!text.trim() || isLoading) return;

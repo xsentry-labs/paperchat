@@ -3,17 +3,31 @@
 /**
  * Authenticated fetch wrapper for API calls to the FastAPI backend.
  *
- * - Reads the current Supabase session and attaches Authorization: Bearer <token>
- * - On 401 with detail="token_expired", calls /api/auth/refresh once and retries
+ * - Caches the access token in memory to avoid calling getSession() on every request
+ * - On 401 with detail="token_expired", refreshes once and retries
  * - Delegates all other errors to the caller unchanged
  */
 
 import { createClient } from "@/lib/supabase/client";
 
+let cachedToken: string | null = null;
+let tokenExpiresAt = 0; // epoch ms
+
 async function getAccessToken(): Promise<string | null> {
+  // Return cached token if still valid (with 30s buffer)
+  if (cachedToken && Date.now() < tokenExpiresAt - 30_000) {
+    return cachedToken;
+  }
+
   const supabase = createClient();
   const { data } = await supabase.auth.getSession();
-  return data.session?.access_token ?? null;
+  const session = data.session;
+  if (!session) return null;
+
+  cachedToken = session.access_token;
+  // expires_at is in seconds
+  tokenExpiresAt = (session.expires_at ?? 0) * 1000;
+  return cachedToken;
 }
 
 async function refreshAccessToken(): Promise<string | null> {
@@ -33,6 +47,9 @@ async function refreshAccessToken(): Promise<string | null> {
     const { access_token, refresh_token } = await res.json();
     // Persist the refreshed session so subsequent calls get the new token
     await supabase.auth.setSession({ access_token, refresh_token });
+    cachedToken = access_token;
+    // Assume 1hr expiry if not provided
+    tokenExpiresAt = Date.now() + 3600_000;
     return access_token;
   } catch {
     return null;
@@ -62,6 +79,10 @@ export async function authFetch(
     }
 
     if (detail === "token_expired") {
+      // Invalidate cache so refresh is forced
+      cachedToken = null;
+      tokenExpiresAt = 0;
+
       const newToken = await refreshAccessToken();
       if (newToken) {
         const retryHeaders = new Headers(init.headers);

@@ -1,4 +1,4 @@
-from datetime import datetime, timezone, timedelta
+from datetime import datetime, timezone
 from dataclasses import dataclass
 from .supabase import get_supabase_admin
 from .config import settings
@@ -24,36 +24,16 @@ async def check_rate_limit(user_id: str) -> RateLimitResult:
         supabase = get_supabase_admin()
         start_of_day = now.replace(hour=0, minute=0, second=0, microsecond=0).isoformat()
 
+        # Single query: count user messages today via inner join on conversations
         result = (
             supabase.table("chat_messages")
-            .select("id", count="exact")
+            .select("id, conversations!inner(user_id)", count="exact")
             .eq("role", "user")
+            .eq("conversations.user_id", user_id)
             .gte("created_at", start_of_day)
-            # Join through conversations to filter by user
             .execute()
         )
-
-        # Count user messages for this user today via conversations join
-        conv_result = (
-            supabase.table("conversations")
-            .select("id")
-            .eq("user_id", user_id)
-            .execute()
-        )
-        conv_ids = [c["id"] for c in (conv_result.data or [])]
-
-        if not conv_ids:
-            count = 0
-        else:
-            msg_result = (
-                supabase.table("chat_messages")
-                .select("id", count="exact")
-                .eq("role", "user")
-                .in_("conversation_id", conv_ids)
-                .gte("created_at", start_of_day)
-                .execute()
-            )
-            count = msg_result.count or 0
+        count = result.count or 0
 
         remaining = max(0, limit - count)
         return RateLimitResult(
@@ -63,10 +43,10 @@ async def check_rate_limit(user_id: str) -> RateLimitResult:
             resets_at=resets_at,
         )
     except Exception:
-        # Fail closed
+        # Fail open — don't block users if rate limit check fails
         return RateLimitResult(
-            allowed=False,
-            remaining=0,
+            allowed=True,
+            remaining=limit,
             limit=limit,
             resets_at=resets_at,
         )

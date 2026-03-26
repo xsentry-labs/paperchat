@@ -1,3 +1,4 @@
+import asyncio
 import time
 from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, status
 from core.auth import get_current_user, AuthUser
@@ -65,14 +66,15 @@ async def upload_document(
 
     doc = doc_result.data[0]
 
-    # Trigger ingestion synchronously
-    try:
-        from ingestion.pipeline import ingest_document
-        await ingest_document(doc["id"])
-        # Re-fetch to get updated status
-        updated = supabase.table("documents").select("*").eq("id", doc["id"]).single().execute()
-        doc = updated.data or doc
-    except Exception as e:
-        print(f"[upload] Ingestion failed for {doc['id']}: {e}")
+    # Trigger ingestion in background — don't block the upload response
+    asyncio.create_task(_run_ingestion(doc["id"]))
 
     return {"document": doc}
+
+
+async def _run_ingestion(document_id: str) -> None:
+    try:
+        from ingestion.pipeline import ingest_document
+        await ingest_document(document_id)
+    except Exception as e:
+        print(f"[upload] Ingestion failed for {document_id}: {e}")

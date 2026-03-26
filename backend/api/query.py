@@ -207,13 +207,7 @@ async def _stream_response(
 
     yield _sse_done()
 
-    # Await all post-stream work inline — background tasks are unreliable in serverless.
-    # The client has received the done signal; this runs before the connection closes.
-    await _save_message(conv["id"], "assistant", final_content, sources)
-
-    if len(history) == 0:
-        await _auto_title(conv["id"], question)
-
+    # Run post-stream work in parallel — client already has the done signal.
     steps = []
     if agent_result:
         steps = [StepLog(step=s["step"], duration_ms=s["duration_ms"], meta=s.get("meta", {}))
@@ -229,7 +223,15 @@ async def _stream_response(
         final_output=final_content[:500],
         model_used=model,
     )
-    await write_agent_log(entry)
+
+    post_tasks = [
+        _save_message(conv["id"], "assistant", final_content, sources),
+        write_agent_log(entry),
+    ]
+    if len(history) == 0:
+        post_tasks.append(_auto_title(conv["id"], question))
+
+    await asyncio.gather(*post_tasks)
 
 
 async def _run_agent_task(initial_messages, tools, model, on_token, on_tool_start, on_tool_end, event_queue):
