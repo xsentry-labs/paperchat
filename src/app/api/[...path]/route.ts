@@ -35,8 +35,13 @@ async function proxyRequest(request: NextRequest) {
     // Forward the backend response back to the client, preserving status,
     // headers, and streaming body.
     const responseHeaders = new Headers(backendResponse.headers);
-    // Remove hop-by-hop headers that shouldn't be forwarded
+    // Remove hop-by-hop and encoding headers that shouldn't be forwarded.
+    // Node fetch auto-decompresses the body, so forwarding content-encoding
+    // would make the browser try to decompress already-decompressed data
+    // (ERR_CONTENT_DECODING_FAILED).
     responseHeaders.delete("transfer-encoding");
+    responseHeaders.delete("content-encoding");
+    responseHeaders.delete("content-length");
 
     return new NextResponse(backendResponse.body, {
       status: backendResponse.status,

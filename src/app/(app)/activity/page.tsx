@@ -11,6 +11,7 @@
 
 import { useEffect, useState, useCallback } from "react";
 import { PROVIDER_LABELS } from "@/lib/models";
+import { authFetch } from "@/lib/auth-fetch";
 
 // ── Types (mirrors agent_logs table) ────────────────────────────────────────
 
@@ -275,7 +276,7 @@ export default function ActivityPage() {
     else setLoadingMore(true);
 
     try {
-      const res = await fetch(
+      const res = await authFetch(
         `/api/agent/logs?limit=${PAGE_SIZE}&offset=${offset}`
       );
       if (!res.ok) throw new Error("Failed to load activity");
