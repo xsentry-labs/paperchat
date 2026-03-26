@@ -91,8 +91,15 @@ def _sse_start(message_id: str) -> str:
     return f'f:{json.dumps({"messageId": message_id})}\n'
 
 
+def _sse_finish_step() -> str:
+    """Vercel AI SDK v6 finish-step — required before finish-message."""
+    payload = {"finishReason": "stop", "usage": {"promptTokens": 0, "completionTokens": 0}, "isContinued": False}
+    return f'e:{json.dumps(payload)}\n'
+
+
 def _sse_done() -> str:
-    return 'd:{"finishReason":"stop"}\n'
+    payload = {"finishReason": "stop", "usage": {"promptTokens": 0, "completionTokens": 0}}
+    return f'd:{json.dumps(payload)}\n'
 
 
 async def _stream_response(
@@ -210,6 +217,7 @@ async def _stream_response(
         error_msg = str(agent_error)
         print(f"[query] Agent error: {error_msg}")
         yield f'3:{json.dumps({"error": error_msg})}\n'
+        yield _sse_finish_step()
         yield _sse_done()
         return
 
@@ -223,6 +231,7 @@ async def _stream_response(
     if sources:
         yield _sse_metadata(sources)
 
+    yield _sse_finish_step()
     yield _sse_done()
 
     # Run post-stream work in parallel — client already has the done signal.

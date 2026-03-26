@@ -126,50 +126,21 @@ export function ChatPanel({ conversationId, initialQuestion }: ChatPanelProps) {
   const [currentModel, setCurrentModel] = useState<string>(DEFAULT_MODEL_ID);
   const [chatError, setChatError] = useState<string | null>(null);
   const [rateLimitRemaining, setRateLimitRemaining] = useState<number | null>(null);
-  const [activeToolName, setActiveToolName] = useState<string | null>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
-  // Intercept the SSE stream to extract tool_event chunks (2: format) for progress display.
-  const trackingFetch = useCallback(async (input: RequestInfo | URL, init?: RequestInit): Promise<Response> => {
-    const response = await authFetch(input, init as RequestInit);
-    if (!response.body) return response;
-    const [stream1, stream2] = response.body.tee();
-    const reader = stream1.getReader();
-    const decoder = new TextDecoder();
-    (async () => {
-      try {
-        while (true) {
-          const { done, value } = await reader.read();
-          if (done) break;
-          const text = decoder.decode(value, { stream: true });
-          for (const line of text.split("\n")) {
-            if (line.startsWith("2:")) {
-              try {
-                const items = JSON.parse(line.slice(2)) as Array<{ type?: string; name?: string; status?: string }>;
-                for (const item of items) {
-                  if (item?.type === "tool_event") {
-                    setActiveToolName(item.status === "start" ? (item.name ?? null) : null);
-                  }
-                }
-              } catch { /* ignore parse errors */ }
-            } else if (line.startsWith("d:")) {
-              setActiveToolName(null);
-            }
-          }
-        }
-      } catch { /* ignore stream errors */ } finally {
-        reader.releaseLock();
-      }
-    })();
-    return new Response(stream2, { status: response.status, statusText: response.statusText, headers: response.headers });
-  }, []);
+  // Pass authFetch directly to the AI SDK — no stream interception.
+  // The tee() approach was breaking the SDK's stream parsing.
+  const sdkFetch = useCallback(
+    (input: RequestInfo | URL, init?: RequestInit) => authFetch(input, init as RequestInit),
+    [],
+  );
 
   const { messages, setMessages, sendMessage, status } = useChat({
     transport: new DefaultChatTransport({
       api: "/api/query",
       body: { conversationId },
-      fetch: trackingFetch,
+      fetch: sdkFetch,
     }),
     onError(err) {
       if (err.message?.includes("daily_limit_reached")) {
@@ -181,7 +152,6 @@ export function ChatPanel({ conversationId, initialQuestion }: ChatPanelProps) {
     },
     onFinish() {
       setChatError(null);
-      setActiveToolName(null);
       window.dispatchEvent(new Event("conversation-updated"));
       authFetch("/api/rate-limit")
         .then((r) => r.json())
@@ -216,7 +186,6 @@ export function ChatPanel({ conversationId, initialQuestion }: ChatPanelProps) {
   }, [conversationId, setMessages]);
 
   const isLoading = status === "submitted" || status === "streaming";
-  const activeToolLabel = isLoading && activeToolName ? (TOOL_LABELS[activeToolName] ?? activeToolName) : null;
   const initialSent = useRef(false);
 
   // Auto-send initial question from home page redirect
@@ -329,21 +298,10 @@ export function ChatPanel({ conversationId, initialQuestion }: ChatPanelProps) {
           })}
 
           {status === "submitted" && (
-            <div className="animate-fade-in">
-              {activeToolLabel ? (
-                <div className="flex items-center gap-2 py-2">
-                  <span className="h-1.5 w-1.5 rounded-full bg-muted-foreground/30 animate-bounce" />
-                  <span className="h-1.5 w-1.5 rounded-full bg-muted-foreground/30 animate-bounce [animation-delay:0.15s]" />
-                  <span className="h-1.5 w-1.5 rounded-full bg-muted-foreground/30 animate-bounce [animation-delay:0.3s]" />
-                  <span className="text-[11px] text-muted-foreground/50 ml-1">{activeToolLabel}…</span>
-                </div>
-              ) : (
-                <div className="flex gap-1 py-2">
-                  <span className="h-1.5 w-1.5 rounded-full bg-muted-foreground/30 animate-bounce" />
-                  <span className="h-1.5 w-1.5 rounded-full bg-muted-foreground/30 animate-bounce [animation-delay:0.15s]" />
-                  <span className="h-1.5 w-1.5 rounded-full bg-muted-foreground/30 animate-bounce [animation-delay:0.3s]" />
-                </div>
-              )}
+            <div className="flex gap-1 py-2 animate-fade-in">
+              <span className="h-1.5 w-1.5 rounded-full bg-muted-foreground/30 animate-bounce" />
+              <span className="h-1.5 w-1.5 rounded-full bg-muted-foreground/30 animate-bounce [animation-delay:0.15s]" />
+              <span className="h-1.5 w-1.5 rounded-full bg-muted-foreground/30 animate-bounce [animation-delay:0.3s]" />
             </div>
           )}
 
