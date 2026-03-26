@@ -7,6 +7,7 @@ import asyncio
 import json
 import re
 import time
+import uuid
 from dataclasses import dataclass
 from typing import AsyncGenerator, Union
 
@@ -83,6 +84,11 @@ def _sse_metadata(sources: list) -> str:
     """Vercel AI SDK message-metadata format."""
     payload = json.dumps({"sources": sources})
     return f'8:{payload}\n'
+
+
+def _sse_start(message_id: str) -> str:
+    """Vercel AI SDK v6 message start — required before text deltas."""
+    return f'f:{json.dumps({"messageId": message_id})}\n'
 
 
 def _sse_done() -> str:
@@ -173,6 +179,9 @@ async def _stream_response(
 
     # Save user message before streaming starts
     await _save_message(conv["id"], "user", question)
+
+    # Emit message start event — required by AI SDK v6 before any text deltas
+    yield _sse_start(str(uuid.uuid4()))
 
     # Run agent in background, stream events via queue
     agent_task = asyncio.create_task(

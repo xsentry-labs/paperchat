@@ -63,7 +63,7 @@ export function Sidebar() {
     if (!confirmDelete) return;
     const { id } = confirmDelete;
     setConfirmDelete(null);
-    const res = await authFetch(`/api/conversations?id=${encodeURIComponent(id)}`, { method: "DELETE" });
+    const res = await authFetch(`/api/conversations/${encodeURIComponent(id)}`, { method: "DELETE" });
     if (res.ok) {
       setConversations((p) => p.filter((c) => c.id !== id));
       if (pathname === `/chat/${id}`) router.push("/");
