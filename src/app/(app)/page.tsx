@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { ModelSelector } from "@/components/chat/ModelSelector";
-import type { ModelKey } from "@/lib/llm";
+import type { ModelKey } from "@/lib/models";
 import { authFetch } from "@/lib/auth-fetch";
 
 export default function HomePage() {

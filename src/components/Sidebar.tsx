@@ -28,10 +28,23 @@ export function Sidebar() {
 
   useEffect(() => { fetchConversations(); }, [fetchConversations]);
 
+  // On message sent, optimistically bump active conversation to the top
+  // instead of refetching the entire list from the server.
   useEffect(() => {
-    window.addEventListener("conversation-updated", fetchConversations);
-    return () => window.removeEventListener("conversation-updated", fetchConversations);
-  }, [fetchConversations]);
+    function handleConversationUpdated() {
+      setConversations((prev) => {
+        // Find the conversation matching the current path
+        const match = prev.find((c) => pathname === `/chat/${c.id}`);
+        if (!match) return prev;
+        return [
+          { ...match, updated_at: new Date().toISOString() },
+          ...prev.filter((c) => c.id !== match.id),
+        ];
+      });
+    }
+    window.addEventListener("conversation-updated", handleConversationUpdated);
+    return () => window.removeEventListener("conversation-updated", handleConversationUpdated);
+  }, [pathname]);
 
   async function handleNewChat() {
     const res = await authFetch("/api/conversations", {
