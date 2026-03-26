@@ -1,6 +1,6 @@
 from __future__ import annotations
 from .base import Tool
-from core.supabase import get_supabase
+from core.supabase import get_supabase_admin
 from core.encryption import derive_user_key, decrypt
 
 
@@ -39,7 +39,7 @@ class ReadDocumentTool(Tool):
         }
 
     async def execute(self, document_name: str, max_chars: int = 8000) -> str:
-        supabase = get_supabase()
+        supabase = get_supabase_admin()
 
         # Find document by name
         doc_result = (

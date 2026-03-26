@@ -1,13 +1,13 @@
 from fastapi import APIRouter, Depends
 from core.auth import get_current_user, AuthUser
-from core.supabase import get_supabase
+from core.supabase import get_supabase_admin
 
 router = APIRouter()
 
 
 @router.get("/api/graph")
 async def get_graph(user: AuthUser = Depends(get_current_user)):
-    supabase = get_supabase()
+    supabase = get_supabase_admin()
 
     # Get all ready documents for user
     docs_result = (

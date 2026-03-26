@@ -1,6 +1,6 @@
 from datetime import datetime, timezone, timedelta
 from dataclasses import dataclass
-from .supabase import get_supabase
+from .supabase import get_supabase_admin
 from .config import settings
 
 
@@ -21,7 +21,7 @@ async def check_rate_limit(user_id: str) -> RateLimitResult:
     resets_at = end_of_day.isoformat()
 
     try:
-        supabase = get_supabase()
+        supabase = get_supabase_admin()
         start_of_day = now.replace(hour=0, minute=0, second=0, microsecond=0).isoformat()
 
         result = (

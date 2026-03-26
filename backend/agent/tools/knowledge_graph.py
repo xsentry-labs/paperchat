@@ -1,6 +1,6 @@
 from __future__ import annotations
 from .base import Tool
-from core.supabase import get_supabase
+from core.supabase import get_supabase_admin
 from core.encryption import derive_user_key, decrypt
 
 
@@ -44,7 +44,7 @@ class KnowledgeGraphTool(Tool):
         }
 
     async def execute(self, entity_name: str, action: str = "find_documents") -> str:
-        supabase = get_supabase()
+        supabase = get_supabase_admin()
 
         # Find matching entities for this user
         ent_result = (

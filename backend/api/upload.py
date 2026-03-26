@@ -1,7 +1,7 @@
 import time
 from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, status
 from core.auth import get_current_user, AuthUser
-from core.supabase import get_supabase
+from core.supabase import get_supabase_admin
 
 router = APIRouter()
 
@@ -36,7 +36,7 @@ async def upload_document(
     if len(content) > MAX_FILE_SIZE:
         raise HTTPException(status_code=400, detail="File too large (max 50 MB)")
 
-    supabase = get_supabase()
+    supabase = get_supabase_admin()
     timestamp = int(time.time() * 1000)
     storage_path = f"{user.id}/{timestamp}_{file.filename}"
 

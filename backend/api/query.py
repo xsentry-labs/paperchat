@@ -16,7 +16,7 @@ from pydantic import BaseModel
 
 from core.auth import get_current_user, AuthUser
 from core.rate_limit import check_rate_limit
-from core.supabase import get_supabase
+from core.supabase import get_supabase_admin
 from core.models import DEFAULT_MODEL_ID
 from core.agent_logger import AgentLogEntry, RetrievedChunkLog, StepLog, write_agent_log
 from agent.loop import run_agent, build_tool_registry
@@ -93,7 +93,7 @@ async def _stream_response(
     request: QueryRequest,
     user: AuthUser,
 ) -> AsyncGenerator[str, None]:
-    supabase = get_supabase()
+    supabase = get_supabase_admin()
 
     # Rate limit check
     rate = await check_rate_limit(user.id)
@@ -267,7 +267,7 @@ async def _save_message(
     sources: list | None = None,
 ) -> None:
     try:
-        supabase = get_supabase()
+        supabase = get_supabase_admin()
         data: dict = {
             "conversation_id": conversation_id,
             "role": role,
@@ -294,7 +294,7 @@ async def _auto_title(conversation_id: str, question: str) -> None:
             temperature=0.3,
         )
         if title:
-            supabase = get_supabase()
+            supabase = get_supabase_admin()
             supabase.table("conversations").update({"title": title.strip()}).eq("id", conversation_id).execute()
     except Exception:
         pass

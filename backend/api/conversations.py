@@ -1,7 +1,7 @@
 from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel
 from core.auth import get_current_user, AuthUser
-from core.supabase import get_supabase
+from core.supabase import get_supabase_admin
 
 router = APIRouter()
 
@@ -13,7 +13,7 @@ class CreateConversationRequest(BaseModel):
 
 @router.get("/api/conversations")
 async def list_conversations(user: AuthUser = Depends(get_current_user)):
-    supabase = get_supabase()
+    supabase = get_supabase_admin()
     result = (
         supabase.table("conversations")
         .select("*, documents(filename)")
@@ -29,7 +29,7 @@ async def create_conversation(
     body: CreateConversationRequest,
     user: AuthUser = Depends(get_current_user),
 ):
-    supabase = get_supabase()
+    supabase = get_supabase_admin()
 
     # Ensure profile exists
     supabase.table("profiles").upsert(
@@ -51,7 +51,7 @@ async def create_conversation(
 
 @router.delete("/api/conversations/{conv_id}")
 async def delete_conversation(conv_id: str, user: AuthUser = Depends(get_current_user)):
-    supabase = get_supabase()
+    supabase = get_supabase_admin()
 
     conv = (
         supabase.table("conversations")
