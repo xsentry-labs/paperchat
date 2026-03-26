@@ -3,10 +3,9 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useChat } from "@ai-sdk/react";
 import { DefaultChatTransport } from "ai";
-import type { ChatMessage } from "@/lib/types";
+import type { UIMessage } from "ai";
 import { DEFAULT_MODEL_ID } from "@/lib/models";
 import { authFetch } from "@/lib/auth-fetch";
-import { CitationCard } from "./CitationCard";
 import { MarkdownContent } from "./MarkdownContent";
 import { ModelSelector } from "./ModelSelector";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -109,8 +108,19 @@ function SourcesCollapsible({ citations }: { citations: Citation[] }) {
   );
 }
 
+/**
+ * Convert a DB chat_message row into an AI SDK UIMessage.
+ * useChat manages messages with `parts`, not a flat `content` string.
+ */
+function dbMessageToUIMessage(msg: { id: string; role: string; content: string; sources?: unknown }): UIMessage {
+  return {
+    id: msg.id,
+    role: msg.role as "user" | "assistant",
+    parts: [{ type: "text" as const, text: msg.content }],
+  };
+}
+
 export function ChatPanel({ conversationId, initialQuestion }: ChatPanelProps) {
-  const [history, setHistory] = useState<ChatMessage[]>([]);
   const [historyLoading, setHistoryLoading] = useState(true);
   const [inputValue, setInputValue] = useState("");
   const [currentModel, setCurrentModel] = useState<string>(DEFAULT_MODEL_ID);
@@ -120,32 +130,7 @@ export function ChatPanel({ conversationId, initialQuestion }: ChatPanelProps) {
   const scrollRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
-  useEffect(() => {
-    setHistoryLoading(true);
-    async function load() {
-      const [msgRes, profileRes, rateLimitRes] = await Promise.all([
-        authFetch(`/api/conversations/${conversationId}/messages`),
-        authFetch("/api/profile"),
-        authFetch("/api/rate-limit"),
-      ]);
-      if (msgRes.ok) {
-        const data = await msgRes.json();
-        setHistory(data.messages);
-      }
-      if (profileRes.ok) {
-        const { profile } = await profileRes.json();
-        if (profile?.preferred_model) setCurrentModel(profile.preferred_model as string);
-      }
-      if (rateLimitRes.ok) {
-        setRateLimitRemaining((await rateLimitRes.json()).remaining);
-      }
-      setHistoryLoading(false);
-    }
-    load();
-  }, [conversationId]);
-
   // Intercept the SSE stream to extract tool_event chunks (2: format) for progress display.
-  // In AI SDK v6, `data` was removed from useChat; we tee the response stream instead.
   const trackingFetch = useCallback(async (input: RequestInfo | URL, init?: RequestInit): Promise<Response> => {
     const response = await authFetch(input, init as RequestInit);
     if (!response.body) return response;
@@ -180,7 +165,7 @@ export function ChatPanel({ conversationId, initialQuestion }: ChatPanelProps) {
     return new Response(stream2, { status: response.status, statusText: response.statusText, headers: response.headers });
   }, []);
 
-  const { messages, sendMessage, status } = useChat({
+  const { messages, setMessages, sendMessage, status } = useChat({
     transport: new DefaultChatTransport({
       api: "/api/query",
       body: { conversationId },
@@ -198,12 +183,37 @@ export function ChatPanel({ conversationId, initialQuestion }: ChatPanelProps) {
       setChatError(null);
       setActiveToolName(null);
       window.dispatchEvent(new Event("conversation-updated"));
-      // Refresh rate limit count only (no history refetch - avoids blink)
       authFetch("/api/rate-limit")
         .then((r) => r.json())
         .then((data) => setRateLimitRemaining(data.remaining ?? null));
     },
   });
+
+  // Load DB history and seed into useChat — single source of truth.
+  useEffect(() => {
+    setHistoryLoading(true);
+    async function load() {
+      const [msgRes, profileRes, rateLimitRes] = await Promise.all([
+        authFetch(`/api/conversations/${conversationId}/messages`),
+        authFetch("/api/profile"),
+        authFetch("/api/rate-limit"),
+      ]);
+      if (msgRes.ok) {
+        const data = await msgRes.json();
+        const uiMessages = (data.messages || []).map(dbMessageToUIMessage);
+        setMessages(uiMessages);
+      }
+      if (profileRes.ok) {
+        const { profile } = await profileRes.json();
+        if (profile?.preferred_model) setCurrentModel(profile.preferred_model as string);
+      }
+      if (rateLimitRes.ok) {
+        setRateLimitRemaining((await rateLimitRes.json()).remaining);
+      }
+      setHistoryLoading(false);
+    }
+    load();
+  }, [conversationId, setMessages]);
 
   const isLoading = status === "submitted" || status === "streaming";
   const activeToolLabel = isLoading && activeToolName ? (TOOL_LABELS[activeToolName] ?? activeToolName) : null;
@@ -211,46 +221,29 @@ export function ChatPanel({ conversationId, initialQuestion }: ChatPanelProps) {
 
   // Auto-send initial question from home page redirect
   useEffect(() => {
-    if (initialQuestion && !initialSent.current && status === "ready") {
+    if (initialQuestion && !initialSent.current && status === "ready" && !historyLoading) {
       initialSent.current = true;
       sendMessage({ text: initialQuestion });
     }
-  }, [initialQuestion, status, sendMessage]);
+  }, [initialQuestion, status, sendMessage, historyLoading]);
 
   useEffect(() => {
     scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: "smooth" });
-  }, [messages, history]);
+  }, [messages]);
 
-  function getTextContent(msg: { parts?: Array<{ type: string; text?: string }>; content?: string }): string {
-    if (msg.parts) return msg.parts.filter((p) => p.type === "text").map((p) => p.text ?? "").join("");
-    return (msg as { content?: string }).content ?? "";
+  function getTextContent(msg: UIMessage): string {
+    return msg.parts
+      .filter((p): p is { type: "text"; text: string } => p.type === "text")
+      .map((p) => p.text)
+      .join("");
   }
 
-  // Sources come from message.metadata (streaming) or message.sources (history from DB)
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   function getSources(msg: any): Citation[] {
     const meta = msg.metadata as { sources?: Citation[] } | undefined;
     if (meta?.sources?.length) return meta.sources;
-    const sources = msg.sources as Citation[] | undefined;
-    if (sources?.length) return sources;
     return [];
   }
-
-  // Deduplicate history (from DB) + streaming messages (from useChat).
-  // NOT memoized — AI SDK updates message parts in-place during streaming
-  // without changing the messages array reference, so useMemo would stale.
-  const historyIds = new Set(history.map((h) => h.content));
-  const streamingMsgs = messages.map((m) => ({
-    id: m.id,
-    role: m.role as "user" | "assistant",
-    content: getTextContent(m),
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    metadata: (m as any).metadata,
-  }));
-  const displayMessages = [
-    ...history,
-    ...streamingMsgs.filter((m) => !historyIds.has(m.content)),
-  ];
 
   async function submitMessage(text: string) {
     if (!text.trim() || isLoading) return;
@@ -276,24 +269,21 @@ export function ChatPanel({ conversationId, initialQuestion }: ChatPanelProps) {
         <div className="mx-auto max-w-2xl px-3 sm:px-4 py-4 sm:py-6 space-y-4 sm:space-y-6">
           {historyLoading ? (
             <div className="pt-16 sm:pt-24 space-y-6 animate-fade-in">
-              {/* Skeleton: assistant message */}
               <div className="space-y-2">
                 <Skeleton className="h-3 w-3/4" />
                 <Skeleton className="h-3 w-5/6" />
                 <Skeleton className="h-3 w-2/3" />
               </div>
-              {/* Skeleton: user message */}
               <div className="flex justify-end">
                 <Skeleton className="h-8 w-48 rounded-2xl" />
               </div>
-              {/* Skeleton: assistant message */}
               <div className="space-y-2">
                 <Skeleton className="h-3 w-5/6" />
                 <Skeleton className="h-3 w-3/4" />
                 <Skeleton className="h-3 w-1/2" />
               </div>
             </div>
-          ) : displayMessages.length === 0 ? (
+          ) : messages.length === 0 ? (
             <div className="flex flex-col items-center justify-center pt-20 sm:pt-32 gap-4 sm:gap-6 px-2">
               <p className="text-sm text-muted-foreground/60 text-center">
                 Ask anything about your documents.
@@ -312,8 +302,8 @@ export function ChatPanel({ conversationId, initialQuestion }: ChatPanelProps) {
             </div>
           ) : null}
 
-          {displayMessages.map((msg, i) => {
-            const content = "content" in msg ? (msg.content as string) : "";
+          {messages.map((msg, i) => {
+            const content = getTextContent(msg);
             const sources = getSources(msg);
             return (
               <div key={msg.id || i} className="animate-fade-in">
@@ -325,7 +315,6 @@ export function ChatPanel({ conversationId, initialQuestion }: ChatPanelProps) {
                   </div>
                 ) : (
                   <div className="space-y-3">
-                    {/* Assistant message - no bubble, just content */}
                     <div className="max-w-full overflow-hidden">
                       <MarkdownContent content={content} />
                     </div>
