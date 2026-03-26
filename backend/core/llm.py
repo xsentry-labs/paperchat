@@ -75,38 +75,38 @@ async def llm_chat(
         kwargs["tool_choice"] = "auto"
 
     content_parts: list[str] = []
-    # tool_calls accumulator: id -> {name, arguments_chunks}
+    # tool_calls accumulator: index -> {name, arguments_chunks}
     tc_accum: dict[int, dict] = {}
 
-    async with client.beta.chat.completions.stream(**kwargs) as stream:
-        async for event in stream:
-            delta = event.choices[0].delta if event.choices else None
-            if delta is None:
-                continue
+    stream = await client.chat.completions.create(**kwargs, stream=True)
+    async for event in stream:
+        if not event.choices:
+            continue
+        delta = event.choices[0].delta
 
-            # Accumulate text
-            if delta.content:
-                content_parts.append(delta.content)
-                if on_token:
-                    await on_token(delta.content)
+        # Accumulate text
+        if delta.content:
+            content_parts.append(delta.content)
+            if on_token:
+                await on_token(delta.content)
 
-            # Accumulate tool calls
-            if delta.tool_calls:
-                for tc_delta in delta.tool_calls:
-                    idx = tc_delta.index
-                    if idx not in tc_accum:
-                        tc_accum[idx] = {
-                            "id": tc_delta.id or "",
-                            "name": tc_delta.function.name or "" if tc_delta.function else "",
-                            "args": "",
-                        }
-                    if tc_delta.id:
-                        tc_accum[idx]["id"] = tc_delta.id
-                    if tc_delta.function:
-                        if tc_delta.function.name:
-                            tc_accum[idx]["name"] = tc_delta.function.name
-                        if tc_delta.function.arguments:
-                            tc_accum[idx]["args"] += tc_delta.function.arguments
+        # Accumulate tool calls
+        if delta.tool_calls:
+            for tc_delta in delta.tool_calls:
+                idx = tc_delta.index
+                if idx not in tc_accum:
+                    tc_accum[idx] = {
+                        "id": tc_delta.id or "",
+                        "name": tc_delta.function.name or "" if tc_delta.function else "",
+                        "args": "",
+                    }
+                if tc_delta.id:
+                    tc_accum[idx]["id"] = tc_delta.id
+                if tc_delta.function:
+                    if tc_delta.function.name:
+                        tc_accum[idx]["name"] = tc_delta.function.name
+                    if tc_delta.function.arguments:
+                        tc_accum[idx]["args"] += tc_delta.function.arguments
 
     tool_calls = []
     for idx in sorted(tc_accum.keys()):
