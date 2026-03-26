@@ -185,8 +185,16 @@ async def _stream_response(
         elif isinstance(item, _ToolEventItem):
             yield _sse_tool_event(item.name, item.status, item.duration_ms)
 
-    # Get agent result
-    agent_result = agent_task.result() if not agent_task.exception() else None
+    # Get agent result — surface errors to the client instead of swallowing them
+    agent_error = agent_task.exception()
+    if agent_error:
+        error_msg = str(agent_error)
+        print(f"[query] Agent error: {error_msg}")
+        yield f'3:{json.dumps({"error": error_msg})}\n'
+        yield _sse_done()
+        return
+
+    agent_result = agent_task.result()
     final_content = "".join(collected_tokens)
 
     # Extract citation sources from content
