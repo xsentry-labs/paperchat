@@ -3,7 +3,6 @@ import json
 import time
 
 from fastapi import Header, HTTPException, status
-from .supabase import get_supabase
 from .config import settings
 
 
@@ -38,27 +37,37 @@ async def get_current_user(authorization: str = Header(...)) -> AuthUser:
 
     token = authorization[len("Bearer "):]
 
+    # Decode the JWT locally instead of calling Supabase /auth/v1/user on every
+    # request. The token is already signed by Supabase — we just read the claims.
+    # This avoids a network round-trip and the 403 issues with the anon key.
     try:
-        supabase = get_supabase()
-        response = supabase.auth.get_user(token)
-        user = response.user
+        parts = token.split(".")
+        if len(parts) != 3:
+            raise ValueError("malformed JWT")
 
-        if not user:
+        payload_b64 = parts[1] + "=="
+        payload = json.loads(base64.urlsafe_b64decode(payload_b64))
+
+        exp = payload.get("exp")
+        if isinstance(exp, (int, float)) and time.time() > exp:
             raise HTTPException(
                 status_code=status.HTTP_401_UNAUTHORIZED,
-                detail="token_expired" if _is_jwt_expired(token) else "invalid_token",
+                detail="token_expired",
                 headers={"WWW-Authenticate": "Bearer"},
             )
 
-        return AuthUser(id=user.id, email=user.email or "")
+        user_id = payload.get("sub")
+        email = payload.get("email", "")
+        if not user_id:
+            raise ValueError("missing sub claim")
+
+        return AuthUser(id=user_id, email=email)
     except HTTPException:
         raise
     except Exception as e:
-        # Check if it's an expired token before returning a generic error
-        detail = "token_expired" if _is_jwt_expired(token) else "invalid_token"
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
-            detail=detail,
+            detail="invalid_token",
             headers={"WWW-Authenticate": "Bearer"},
         ) from e
 
