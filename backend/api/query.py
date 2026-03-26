@@ -17,7 +17,7 @@ from pydantic import BaseModel
 from core.auth import get_current_user, AuthUser
 from core.rate_limit import check_rate_limit
 from core.supabase import get_supabase_admin
-from core.models import DEFAULT_MODEL_ID
+from core.models import DEFAULT_MODEL_ID, is_valid_model
 from core.agent_logger import AgentLogEntry, RetrievedChunkLog, StepLog, write_agent_log
 from agent.loop import run_agent, build_tool_registry
 from agent.context import SYSTEM_PROMPT, build_messages
@@ -122,7 +122,8 @@ async def _stream_response(
 
     conv = conv_result.data
     profile = conv.get("profiles") or {}
-    model = profile.get("preferred_model") or DEFAULT_MODEL_ID
+    preferred = profile.get("preferred_model") or ""
+    model = preferred if is_valid_model(preferred) else DEFAULT_MODEL_ID
 
     # Extract latest user message
     user_messages = [m for m in request.messages if m.role == "user"]
