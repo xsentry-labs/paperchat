@@ -142,10 +142,19 @@ async def _stream_response(
         yield f'3:{json.dumps({"error": "Empty question"})}\n'
         return
 
-    # Build history from request messages (exclude last user msg)
-    history = []
-    for msg in request.messages[:-1]:
-        history.append({"role": msg.role, "content": _extract_text(msg)})
+    # Load full conversation history from DB — the frontend's useChat only
+    # tracks the current session, so request.messages is incomplete.
+    db_messages = (
+        supabase.table("chat_messages")
+        .select("role, content")
+        .eq("conversation_id", request.conversationId)
+        .order("created_at")
+        .execute()
+    )
+    history = [
+        {"role": m["role"], "content": m["content"]}
+        for m in (db_messages.data or [])
+    ]
 
     # Get document IDs tied to this conversation (if any)
     doc_id = conv.get("document_id")
