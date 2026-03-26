@@ -1,13 +1,13 @@
 from fastapi import APIRouter, Depends, HTTPException, status
 from core.auth import get_current_user, AuthUser
-from core.supabase import get_supabase
+from core.supabase import get_supabase_admin
 
 router = APIRouter()
 
 
 @router.get("/api/conversations/{conv_id}/messages")
 async def get_messages(conv_id: str, user: AuthUser = Depends(get_current_user)):
-    supabase = get_supabase()
+    supabase = get_supabase_admin()
 
     # Verify ownership
     conv = (

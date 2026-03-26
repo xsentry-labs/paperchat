@@ -1,7 +1,7 @@
 from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import Any
-from .supabase import get_supabase
+from .supabase import get_supabase_admin
 
 
 @dataclass
@@ -42,7 +42,7 @@ def _serialize(obj: Any) -> Any:
 
 async def write_agent_log(entry: AgentLogEntry) -> None:
     try:
-        supabase = get_supabase()
+        supabase = get_supabase_admin()
         supabase.table("agent_logs").insert({
             "user_id": entry.user_id,
             "conversation_id": entry.conversation_id,
@@ -64,7 +64,7 @@ async def get_agent_logs(
     offset: int = 0,
 ) -> dict:
     limit = min(limit, 100)
-    supabase = get_supabase()
+    supabase = get_supabase_admin()
 
     result = (
         supabase.table("agent_logs")

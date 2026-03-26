@@ -2,7 +2,7 @@
 
 Chat with your documents. Upload PDFs, spreadsheets, presentations, ebooks, and more - get cited answers powered by AI.
 
-Built with Next.js 15, Supabase, pgvector, and OpenRouter.
+Built with Next.js 15, FastAPI, Supabase, pgvector, and OpenRouter.
 
 ## Features
 
@@ -25,19 +25,27 @@ Built with Next.js 15, Supabase, pgvector, and OpenRouter.
 ### Prerequisites
 
 - Node.js 20+
+- Python 3.11+
 - A [Supabase](https://supabase.com) project (free tier works)
 - An [OpenAI](https://platform.openai.com) API key (for embeddings + summaries)
 - An [OpenRouter](https://openrouter.ai) API key (for chat models)
 
 ### Setup
 
-1. Clone the repo and install dependencies:
+1. Clone the repo and install frontend dependencies:
 
 ```bash
 npm install
 ```
 
-2. Create `.env.local` and fill in your keys:
+2. Install backend dependencies:
+
+```bash
+cd backend
+pip install -r requirements.txt
+```
+
+3. Create `.env.local` and fill in your keys:
 
 ```
 NEXT_PUBLIC_SUPABASE_URL=https://your-project.supabase.co
@@ -55,15 +63,22 @@ OPENROUTER_API_KEY=your-openrouter-key
 ENCRYPTION_SECRET=your-random-secret-here
 ```
 
-3. Run all SQL migrations in order in the Supabase SQL Editor. They're in `supabase/migrations/` (001 through 013).
+4. Run all SQL migrations in order in the Supabase SQL Editor. They're in `supabase/migrations/` (001 through 013).
 
-4. Start the dev server:
+5. Start the backend:
+
+```bash
+cd backend
+uvicorn main:app --reload --port 8000
+```
+
+6. Start the frontend dev server:
 
 ```bash
 npm run dev
 ```
 
-5. Open [localhost:3000](http://localhost:3000), sign up, upload a document, and start chatting.
+7. Open [localhost:3000](http://localhost:3000), sign up, upload a document, and start chatting.
 
 ### Tests
 
@@ -123,14 +138,25 @@ Deletion is fully cascaded: removing a document removes its chunks, which remove
 
 ## Stack
 
+### Frontend
 - **Next.js 15** - app router, server components, streaming API routes
-- **Supabase** - auth, Postgres, pgvector, file storage
-- **OpenAI** - `text-embedding-3-small` for document embeddings
-- **OpenRouter** - multi-model LLM access (OpenAI, Anthropic, Google, Meta, Mistral, DeepSeek)
-- **compromise.js** - lightweight pure-JS NLP for entity extraction
 - **Vercel AI SDK v6** - streaming chat with `createUIMessageStream` + `message-metadata` for inline source delivery
-- **Vitest** - unit tests
 - **Tailwind CSS v4** - dark/light theme UI
+- **compromise.js** - lightweight pure-JS NLP for entity extraction
+- **Vitest** - unit tests
+
+### Backend
+- **FastAPI** - async Python API server
+- **spaCy 3.8** - NLP for entity extraction during ingestion
+- **PyMuPDF** - PDF parsing and OCR
+- **openai 2.x** - embeddings (`text-embedding-3-small`) and LLM calls
+- **pandas / numpy** - data processing for spreadsheet ingestion
+- **python-docx / python-pptx / openpyxl / ebooklib** - document parsing (DOCX, PPTX, XLSX, EPUB)
+- **cryptography** - AES-256-GCM encryption at rest
+
+### Infrastructure
+- **Supabase** - auth, Postgres, pgvector, file storage
+- **OpenRouter** - multi-model LLM access (OpenAI, Anthropic, Google, Meta, Mistral, DeepSeek)
 
 ## Pages
 

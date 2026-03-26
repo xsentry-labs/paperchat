@@ -1,6 +1,6 @@
 from __future__ import annotations
 from .base import Tool
-from core.supabase import get_supabase
+from core.supabase import get_supabase_admin
 
 # Read-only: only allow SELECT statements
 ALLOWED_STATEMENTS = ("select",)
@@ -46,7 +46,7 @@ class SqlQueryTool(Tool):
             pass  # RLS will handle it
 
         try:
-            supabase = get_supabase()
+            supabase = get_supabase_admin()
             result = supabase.rpc("execute_user_query", {
                 "sql": query,
                 "p_user_id": self._user_id,

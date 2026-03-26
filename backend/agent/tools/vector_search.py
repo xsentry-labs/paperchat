@@ -2,7 +2,7 @@ from __future__ import annotations
 from .base import Tool
 from core.embeddings import embed_text
 from core.encryption import derive_user_key, decrypt
-from core.supabase import get_supabase
+from core.supabase import get_supabase_admin
 
 
 class VectorSearchTool(Tool):
@@ -43,7 +43,7 @@ class VectorSearchTool(Tool):
     async def execute(self, query: str, k: int = 5) -> str:
         k = min(k, 10)
         embedding = await embed_text(query)
-        supabase = get_supabase()
+        supabase = get_supabase_admin()
 
         rpc_args = {
             "query_embedding": embedding,

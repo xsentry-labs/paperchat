@@ -3,7 +3,7 @@ Ingestion pipeline orchestrator.
 Parse → Chunk → Embed → Encrypt → Store → Entity extract → Summarize
 """
 from __future__ import annotations
-from core.supabase import get_supabase
+from core.supabase import get_supabase_admin
 from core.embeddings import embed_batch
 from core.encryption import derive_user_key, encrypt
 from core.llm import llm_complete
@@ -16,7 +16,7 @@ BATCH_SIZE = 50
 
 
 async def ingest_document(document_id: str) -> dict:
-    supabase = get_supabase()
+    supabase = get_supabase_admin()
 
     # 1. Fetch document record
     doc_result = (
@@ -104,7 +104,7 @@ async def _extract_and_store_entities(
     chunks: list,
     user_id: str,
 ) -> None:
-    supabase = get_supabase()
+    supabase = get_supabase_admin()
 
     for chunk_id, chunk in zip(chunk_ids, chunks):
         try:

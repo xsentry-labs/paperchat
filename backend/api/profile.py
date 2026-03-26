@@ -1,7 +1,7 @@
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 from core.auth import get_current_user, AuthUser
-from core.supabase import get_supabase
+from core.supabase import get_supabase_admin
 from core.models import is_valid_model
 
 router = APIRouter()
@@ -13,7 +13,7 @@ class UpdateProfileRequest(BaseModel):
 
 @router.get("/api/profile")
 async def get_profile(user: AuthUser = Depends(get_current_user)):
-    supabase = get_supabase()
+    supabase = get_supabase_admin()
     result = (
         supabase.table("profiles")
         .select("*")
@@ -32,7 +32,7 @@ async def update_profile(
     if not is_valid_model(body.preferred_model):
         raise HTTPException(status_code=400, detail="Invalid model ID")
 
-    supabase = get_supabase()
+    supabase = get_supabase_admin()
     result = (
         supabase.table("profiles")
         .update({"preferred_model": body.preferred_model})
