@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useChat } from "@ai-sdk/react";
 import { DefaultChatTransport } from "ai";
 import type { ChatMessage } from "@/lib/types";
@@ -236,21 +236,21 @@ export function ChatPanel({ conversationId, initialQuestion }: ChatPanelProps) {
     return [];
   }
 
-  // Memoize message dedup — history + streaming messages merged without duplicates
-  const displayMessages = useMemo(() => {
-    const historyIds = new Set(history.map((h) => h.content));
-    const streamingMsgs = messages.map((m) => ({
-      id: m.id,
-      role: m.role as "user" | "assistant",
-      content: getTextContent(m),
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      metadata: (m as any).metadata,
-    }));
-    return [
-      ...history,
-      ...streamingMsgs.filter((m) => !historyIds.has(m.content)),
-    ];
-  }, [history, messages]);
+  // Deduplicate history (from DB) + streaming messages (from useChat).
+  // NOT memoized — AI SDK updates message parts in-place during streaming
+  // without changing the messages array reference, so useMemo would stale.
+  const historyIds = new Set(history.map((h) => h.content));
+  const streamingMsgs = messages.map((m) => ({
+    id: m.id,
+    role: m.role as "user" | "assistant",
+    content: getTextContent(m),
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    metadata: (m as any).metadata,
+  }));
+  const displayMessages = [
+    ...history,
+    ...streamingMsgs.filter((m) => !historyIds.has(m.content)),
+  ];
 
   async function submitMessage(text: string) {
     if (!text.trim() || isLoading) return;
